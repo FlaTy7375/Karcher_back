@@ -693,7 +693,8 @@ app.use(express.json());
 const corsOptions = {
     origin: '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true
 };
 
 app.use(cors(corsOptions));
@@ -1348,6 +1349,25 @@ app.get('/check-duplicate-client', async (req, res) => {
         console.error('Error checking duplicate client:', err);
         res.status(500).json({ error: 'Internal server error', details: err.message });
     }
+});
+
+app.get('/', (req, res) => {
+    res.json({
+        message: 'Karcher Booking API',
+        version: '1.0.0',
+        status: 'running',
+        endpoints: [
+            '/clients',
+            '/bookings',
+            '/comments',
+            '/availability-by-date',
+            '/all-bookings-by-service'
+        ]
+    });
+});
+
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 pool.connect((err, client, release) => {
