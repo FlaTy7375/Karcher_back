@@ -15,6 +15,36 @@ const pool = new Pool({
   }
 });
 
+// ============ НАСТРОЙКА CORS ============
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'https://karcher-front.vercel.app',
+  'https://karcher-front.netlify.app'
+];
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log('CORS: Запрос с origin:', origin);
+      callback(null, true);
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Content-Length', 'X-Powered-By'],
+  maxAge: 86400
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+
+// ============ TELEGRAM BOT (ПОЛНЫЙ КОД) ============
 let bot = null;
 let userStates = {};
 let sendBookingNotification = null;
@@ -74,6 +104,7 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
             }
         };
 
+        // === КОМАНДА /start ===
         bot.onText(/\/start/, (msg) => {
             const chatId = msg.chat.id;
             const isAdmin = chatId.toString() === ADMIN_CHAT_ID;
@@ -98,12 +129,14 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
             }
         });
 
+        // === КОМАНДА НАЗАД ===
         bot.onText(/↩️ Назад/, (msg) => {
             const chatId = msg.chat.id;
             delete userStates[chatId];
             bot.sendMessage(chatId, 'Главное меню:', { ...mainKeyboard });
         });
 
+        // === ВСЕ БРОНИРОВАНИЯ (УПОРЯДОЧЕННЫЕ ПО УСЛУГАМ) ===
         bot.onText(/📋 Все бронирования/, async (msg) => {
             const chatId = msg.chat.id;
             
@@ -175,6 +208,7 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
             }
         });
 
+        // === БРОНИРОВАНИЯ НА СЕГОДНЯ ===
         bot.onText(/📅 На сегодня/, async (msg) => {
             const chatId = msg.chat.id;
             
@@ -227,6 +261,7 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
             }
         });
 
+        // === ДОБАВИТЬ БРОНИРОВАНИЕ (начало) ===
         bot.onText(/➕ Добавить бронирование/, (msg) => {
             const chatId = msg.chat.id;
             
@@ -249,6 +284,7 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
             );
         });
 
+        // === ВЫБОР УСЛУГИ ===
         bot.onText(/🧹 Пылесос Puzzi 8\/1 C|💨 Пароочиститель SC 4|💦 Мойка K 5/, (msg) => {
             const chatId = msg.chat.id;
             const service = msg.text;
@@ -277,6 +313,7 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
             );
         });
 
+        // === ОБРАБОТКА ДАТЫ ===
         bot.on('message', async (msg) => {
             const chatId = msg.chat.id;
             const text = msg.text;
@@ -346,6 +383,7 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
             }
         });
 
+        // === ПОДТВЕРЖДЕНИЕ ДОБАВЛЕНИЯ ===
         bot.onText(/✅ Подтвердить/, async (msg) => {
             const chatId = msg.chat.id;
             
@@ -410,12 +448,14 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
             }
         });
 
+        // === ОТМЕНА ===
         bot.onText(/❌ Отменить/, (msg) => {
             const chatId = msg.chat.id;
             delete userStates[chatId];
             bot.sendMessage(chatId, '❌ Действие отменено', { ...mainKeyboard });
         });
 
+        // === УДАЛИТЬ БРОНИРОВАНИЕ ===
         bot.onText(/🗑️ Удалить брони/, (msg) => {
             const chatId = msg.chat.id;
             
@@ -436,6 +476,7 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
             );
         });
 
+        // === ОБРАБОТКА УДАЛЕНИЯ ===
         bot.on('message', async (msg) => {
             const chatId = msg.chat.id;
             const text = msg.text;
@@ -502,6 +543,7 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
             }
         });
 
+        // === ПОДТВЕРЖДЕНИЕ УДАЛЕНИЯ ===
         bot.onText(/✅ Да/, async (msg) => {
             const chatId = msg.chat.id;
             
@@ -546,6 +588,7 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
             delete userStates[chatId];
         });
 
+        // === ОТМЕНА УДАЛЕНИЯ ===
         bot.onText(/❌ Нет/, (msg) => {
             const chatId = msg.chat.id;
             if (userStates[chatId] && userStates[chatId].step === 'confirm_delete') {
@@ -554,6 +597,7 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
             }
         });
 
+        // === КЛИЕНТЫ ===
         bot.onText(/👥 Клиенты/, async (msg) => {
             const chatId = msg.chat.id;
             
@@ -599,6 +643,7 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
             }
         });
 
+        // === СТАТИСТИКА ===
         bot.onText(/📊 Статистика/, async (msg) => {
             const chatId = msg.chat.id;
             
@@ -637,6 +682,7 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
             }
         });
 
+        // === ФУНКЦИЯ ДЛЯ УВЕДОМЛЕНИЙ ===
         sendBookingNotification = async (bookingData) => {
             try {
                 const clientInfo = await pool.query(
@@ -686,21 +732,40 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
     console.log('⚠️ Telegram bot token or admin chat ID not configured');
 }
 
+// ============ ОСТАЛЬНЫЙ КОД СЕРВЕРА ============
 const saltRounds = 10;
 
-app.use(express.json());
+app.use(express.json()); 
 
-const corsOptions = {
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true
-};
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} ${req.method} ${req.url}`);
+  console.log('Origin:', req.headers.origin);
+  next();
+});
 
-app.use(cors(corsOptions));
+// Middleware для CORS заголовков
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  
+  if (origin && allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  } else if (!origin) {
+    res.header('Access-Control-Allow-Origin', '*');
+  }
+  
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Expose-Headers', 'Content-Length, X-Powered-By');
+  
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
+  next();
+});
 
-app.options('*', cors(corsOptions));
-
+// GET /clients
 app.get('/clients', async (req, res) => {
     try {
         const result = await pool.query('SELECT id, first_name, last_name, email, phone_number, address FROM clients ORDER BY id ASC');
@@ -711,6 +776,7 @@ app.get('/clients', async (req, res) => {
     }
 });
 
+// POST /clients (регистрация)
 app.post('/clients', async (req, res) => {
     const { first_name, last_name, email, phone_number, address, password } = req.body;
 
@@ -741,6 +807,7 @@ app.post('/clients', async (req, res) => {
     }
 });
 
+// GET /clients/search
 app.get('/clients/search', async (req, res) => {
     const { phone } = req.query;
     
@@ -765,6 +832,7 @@ app.get('/clients/search', async (req, res) => {
     }
 });
 
+// POST /login
 app.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
@@ -798,6 +866,7 @@ app.post('/login', async (req, res) => {
     }
 });
 
+// POST /find-or-create-client
 app.post('/find-or-create-client', async (req, res) => {
     console.log('🔍 Создание нового клиента:', req.body);
     
@@ -867,6 +936,7 @@ app.post('/find-or-create-client', async (req, res) => {
     }
 });
 
+// POST /bookings
 app.post('/bookings', async (req, res) => {
     console.log('📨 POST /bookings запрос:', req.body);
     
@@ -931,6 +1001,7 @@ app.post('/bookings', async (req, res) => {
     }
 });
 
+// GET /bookings
 app.get('/bookings', async (req, res) => {
     try {
         const { serviceName } = req.query; 
@@ -967,6 +1038,106 @@ app.get('/bookings', async (req, res) => {
     }
 });
 
+// GET /comments
+app.get('/comments', async (req, res) => {
+  try {
+    console.log('📝 Получение комментариев из базы данных');
+    const result = await pool.query(`
+      SELECT id, client_id, author_name, comment_text, 
+             TO_CHAR(created_at, 'DD.MM.YYYY') as created_at, 
+             rating
+      FROM comments 
+      WHERE is_approved = true
+      ORDER BY created_at DESC
+    `);
+    
+    console.log(`✅ Найдено ${result.rows.length} комментариев`);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching comments:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /comments
+app.post('/comments', async (req, res) => {
+  const { client_id, comment_text, author_name, rating } = req.body;
+  
+  console.log('📝 POST /comments запрос:', req.body);
+  
+  if (!comment_text || comment_text.trim().length === 0) {
+    return res.status(400).json({ error: 'Текст комментария обязателен' });
+  }
+  
+  if (rating && (rating < 1 || rating > 5)) {
+    return res.status(400).json({ error: 'Рейтинг должен быть от 1 до 5' });
+  }
+  
+  try {
+    if (client_id) {
+      const existingComment = await pool.query(
+        'SELECT id FROM comments WHERE client_id = $1 LIMIT 1',
+        [client_id]
+      );
+      
+      if (existingComment.rows.length > 0) {
+        return res.status(400).json({ 
+          error: 'Вы уже оставляли комментарий. Удалите старый чтобы добавить новый.' 
+        });
+      }
+    }
+    
+    const result = await pool.query(
+      `INSERT INTO comments (client_id, author_name, comment_text, rating, is_approved) 
+       VALUES ($1, $2, $3, $4, true) 
+       RETURNING id, client_id, author_name, comment_text, 
+                 TO_CHAR(created_at, 'DD.MM.YYYY') as created_at, rating`,
+      [client_id || null, author_name || 'Аноним', comment_text.trim(), rating || null]
+    );
+    
+    console.log('✅ Комментарий добавлен с ID:', result.rows[0].id);
+    
+    res.status(201).json({
+      ...result.rows[0],
+      message: 'Комментарий успешно добавлен!'
+    });
+    
+  } catch (err) {
+    console.error('Error adding comment:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// DELETE /comments/:id
+app.delete('/comments/:id', async (req, res) => {
+  const { id } = req.params;
+  
+  console.log('🗑️ DELETE /comments запрос для ID:', id);
+  
+  try {
+    const result = await pool.query(
+      'DELETE FROM comments WHERE id = $1 RETURNING id',
+      [id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Комментарий не найден' });
+    }
+    
+    console.log('✅ Комментарий удален с ID:', result.rows[0].id);
+    
+    res.json({ 
+      message: 'Комментарий удален',
+      deletedId: result.rows[0].id 
+    });
+    
+  } catch (err) {
+    console.error('Error deleting comment:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /all-bookings-by-service
 app.get('/all-bookings-by-service', async (req, res) => {
     try {
         const result = await pool.query(`
@@ -993,6 +1164,7 @@ app.get('/all-bookings-by-service', async (req, res) => {
     }
 });
 
+// GET /availability-by-date
 app.get('/availability-by-date', async (req, res) => {
     const { date } = req.query;
     
@@ -1044,23 +1216,7 @@ app.get('/availability-by-date', async (req, res) => {
     }
 });
 
-app.get('/booking-stats', async (req, res) => {
-    try {
-        const result = await pool.query(`
-            SELECT 
-                service_name,
-                COUNT(*) as booking_count
-            FROM bookings 
-            GROUP BY service_name
-            ORDER BY service_name
-        `);
-        res.json(result.rows);
-    } catch (err) {
-        console.error('Error fetching booking stats:', err);
-        res.status(500).json({ error: 'Internal server error', details: err.message });
-    }
-});
-
+// GET /check-availability
 app.get('/check-availability', async (req, res) => {
     const { service_id, date } = req.query;
     
@@ -1094,6 +1250,7 @@ app.get('/check-availability', async (req, res) => {
     }
 });
 
+// PUT /clients/:id
 app.put('/clients/:id', async (req, res) => {
     const { id } = req.params;
     const { first_name, last_name, email, phone_number, address } = req.body;
@@ -1115,6 +1272,7 @@ app.put('/clients/:id', async (req, res) => {
     }
 });
 
+// DELETE /clients/:id
 app.delete('/clients/:id', async (req, res) => {
     const { id } = req.params;
     try {
@@ -1132,6 +1290,7 @@ app.delete('/clients/:id', async (req, res) => {
     }
 });
 
+// GET /bookings/:id
 app.get('/bookings/:id', async (req, res) => {
     const { id } = req.params;
     try {
@@ -1160,6 +1319,7 @@ app.get('/bookings/:id', async (req, res) => {
     }
 });
 
+// GET /clients/:id/bookings
 app.get('/clients/:id/bookings', async (req, res) => {
     const { id } = req.params; 
     try {
@@ -1186,6 +1346,7 @@ app.get('/clients/:id/bookings', async (req, res) => {
     }
 });
 
+// PUT /bookings/:id
 app.put('/bookings/:id', async (req, res) => {
     const { id } = req.params;
     const { client_id, service_name, booking_date } = req.body; 
@@ -1219,6 +1380,7 @@ app.put('/bookings/:id', async (req, res) => {
     }
 });
 
+// DELETE /bookings/:id
 app.delete('/bookings/:id', async (req, res) => {
     const { id } = req.params;
     try {
@@ -1233,92 +1395,7 @@ app.delete('/bookings/:id', async (req, res) => {
     }
 });
 
-app.get('/comments', async (req, res) => {
-  try {
-    const result = await pool.query(`
-      SELECT id, client_id, author_name, comment_text, 
-             TO_CHAR(created_at, 'DD.MM.YYYY') as created_at, 
-             rating
-      FROM comments 
-      WHERE is_approved = true
-      ORDER BY created_at DESC
-    `);
-    
-    res.json(result.rows);
-  } catch (err) {
-    console.error('Error fetching comments:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-app.post('/comments', async (req, res) => {
-  const { client_id, comment_text, author_name, rating } = req.body;
-  
-  if (!comment_text || comment_text.trim().length === 0) {
-    return res.status(400).json({ error: 'Текст комментария обязателен' });
-  }
-  
-  if (rating && (rating < 1 || rating > 5)) {
-    return res.status(400).json({ error: 'Рейтинг должен быть от 1 до 5' });
-  }
-  
-  try {
-    if (client_id) {
-      const existingComment = await pool.query(
-        'SELECT id FROM comments WHERE client_id = $1 LIMIT 1',
-        [client_id]
-      );
-      
-      if (existingComment.rows.length > 0) {
-        return res.status(400).json({ 
-          error: 'Вы уже оставляли комментарий. Удалите старый чтобы добавить новый.' 
-        });
-      }
-    }
-    
-    const result = await pool.query(
-      `INSERT INTO comments (client_id, author_name, comment_text, rating, is_approved) 
-       VALUES ($1, $2, $3, $4, true) 
-       RETURNING id, client_id, author_name, comment_text, 
-                 TO_CHAR(created_at, 'DD.MM.YYYY') as created_at, rating`,
-      [client_id || null, author_name || 'Аноним', comment_text.trim(), rating || null]
-    );
-    
-    res.status(201).json({
-      ...result.rows[0],
-      message: 'Комментарий успешно добавлен!'
-    });
-    
-  } catch (err) {
-    console.error('Error adding comment:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-app.delete('/comments/:id', async (req, res) => {
-  const { id } = req.params;
-  
-  try {
-    const result = await pool.query(
-      'DELETE FROM comments WHERE id = $1 RETURNING id',
-      [id]
-    );
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Комментарий не найден' });
-    }
-    
-    res.json({ 
-      message: 'Комментарий удален',
-      deletedId: result.rows[0].id 
-    });
-    
-  } catch (err) {
-    console.error('Error deleting comment:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
+// GET /check-duplicate-client
 app.get('/check-duplicate-client', async (req, res) => {
     const { phone } = req.query;
     
@@ -1351,6 +1428,7 @@ app.get('/check-duplicate-client', async (req, res) => {
     }
 });
 
+// GET /
 app.get('/', (req, res) => {
     res.json({
         message: 'Karcher Booking API',
@@ -1366,8 +1444,14 @@ app.get('/', (req, res) => {
     });
 });
 
+// GET /health
 app.get('/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    res.json({ 
+        status: 'ok', 
+        timestamp: new Date().toISOString(),
+        cors: 'enabled',
+        origins: allowedOrigins
+    });
 });
 
 pool.connect((err, client, release) => {
@@ -1381,6 +1465,7 @@ pool.connect((err, client, release) => {
 
 app.listen(port, () => {
     console.log(`🚀 Server running on port ${port}`);
+    console.log(`🌐 CORS enabled for origins: ${allowedOrigins.join(', ')}`);
     if (bot) {
         console.log(`🤖 Telegram bot with buttons is active`);
     }
