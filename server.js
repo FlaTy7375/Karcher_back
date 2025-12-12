@@ -41,24 +41,11 @@ const corsOptions = {
   maxAge: 86400
 };
 
+// Упрощенная настройка CORS
 app.use(cors(corsOptions));
-app.options('*', (req, res) => {
-  const origin = req.headers.origin;
-  
-  if (origin && allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-  } else if (!origin) {
-    res.header('Access-Control-Allow-Origin', '*');
-  }
-  
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  res.header('Access-Control-Expose-Headers', 'Content-Length, X-Powered-By');
-  res.header('Access-Control-Max-Age', '86400');
-  
-  res.status(200).end();
-})
+
+// Явная обработка OPTIONS запросов
+app.options('*', cors(corsOptions));
 
 // ============ TELEGRAM BOT (ПОЛНЫЙ КОД) ============
 let bot = null;
@@ -759,25 +746,9 @@ app.use((req, res, next) => {
   next();
 });
 
-// Middleware для CORS заголовков
+// Middleware для логирования
 app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  
-  if (origin && allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-  } else if (!origin) {
-    res.header('Access-Control-Allow-Origin', '*');
-  }
-  
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  res.header('Access-Control-Expose-Headers', 'Content-Length, X-Powered-By');
-  
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-  
+  console.log(`${new Date().toISOString()} ${req.method} ${req.url}`);
   next();
 });
 
