@@ -8,18 +8,16 @@ const { Pool } = require('pg');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// ============ НАСТРОЙКА ПОДКЛЮЧЕНИЯ К NEON ============
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
-    rejectUnauthorized: false // Важно для Neon
+    rejectUnauthorized: false
   }
 });
 
-// Инициализация Telegram бота
 let bot = null;
-let userStates = {}; // Для хранения состояния пользователей
-let sendBookingNotification = null; // Функция для уведомлений
+let userStates = {};
+let sendBookingNotification = null;
 
 if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
     try {
@@ -28,7 +26,6 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
         
         console.log('🤖 Telegram bot initialized with button interface');
 
-        // === КЛАВИАТУРЫ ===
         const mainKeyboard = {
             reply_markup: {
                 keyboard: [
@@ -77,12 +74,11 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
             }
         };
 
-        // === КОМАНДА /start ===
         bot.onText(/\/start/, (msg) => {
             const chatId = msg.chat.id;
             const isAdmin = chatId.toString() === ADMIN_CHAT_ID;
             
-            delete userStates[chatId]; // Сброс состояния
+            delete userStates[chatId];
             
             if (isAdmin) {
                 bot.sendMessage(chatId, 
@@ -102,17 +98,12 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
             }
         });
 
-        // === КОМАНДА НАЗАД ===
         bot.onText(/↩️ Назад/, (msg) => {
             const chatId = msg.chat.id;
-            delete userStates[chatId]; // Сброс состояния
-            bot.sendMessage(chatId, 
-                'Главное меню:',
-                { ...mainKeyboard }
-            );
+            delete userStates[chatId];
+            bot.sendMessage(chatId, 'Главное меню:', { ...mainKeyboard });
         });
 
-        // === ВСЕ БРОНИРОВАНИЯ (УПОРЯДОЧЕННЫЕ ПО УСЛУГАМ) ===
         bot.onText(/📋 Все бронирования/, async (msg) => {
             const chatId = msg.chat.id;
             
@@ -141,7 +132,6 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
                     return;
                 }
                 
-                // Группируем по услугам для красивого отображения
                 const groupedBookings = {};
                 result.rows.forEach(booking => {
                     if (!groupedBookings[booking.service_name]) {
@@ -152,7 +142,6 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
                 
                 let message = '📋 *Все бронирования по услугам:*\n\n';
                 
-                // Определяем порядок услуг
                 const serviceOrder = [
                     'Аренда пылесоса Karcher Puzzi 8/1 C',
                     'Аренда пароочистителя Karcher SC 4 Deluxe', 
@@ -162,7 +151,6 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
                 serviceOrder.forEach(serviceName => {
                     const bookings = groupedBookings[serviceName];
                     if (bookings && bookings.length > 0) {
-                        // Красивое название услуги для вывода
                         let serviceEmoji = '🧹';
                         if (serviceName.includes('пароочистителя')) serviceEmoji = '💨';
                         if (serviceName.includes('мойки')) serviceEmoji = '💦';
@@ -187,7 +175,6 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
             }
         });
 
-        // === БРОНИРОВАНИЯ НА СЕГОДНЯ ===
         bot.onText(/📅 На сегодня/, async (msg) => {
             const chatId = msg.chat.id;
             
@@ -240,7 +227,6 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
             }
         });
 
-        // === ДОБАВИТЬ БРОНИРОВАНИЕ (начало) ===
         bot.onText(/➕ Добавить бронирование/, (msg) => {
             const chatId = msg.chat.id;
             
@@ -263,7 +249,6 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
             );
         });
 
-        // === ВЫБОР УСЛУГИ ===
         bot.onText(/🧹 Пылесос Puzzi 8\/1 C|💨 Пароочиститель SC 4|💦 Мойка K 5/, (msg) => {
             const chatId = msg.chat.id;
             const service = msg.text;
@@ -292,12 +277,10 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
             );
         });
 
-        // === ОБРАБОТКА ДАТЫ ===
         bot.on('message', async (msg) => {
             const chatId = msg.chat.id;
             const text = msg.text;
             
-            // Игнорируем команды кнопок
             if (['📋 Все бронирования', '📅 На сегодня', '➕ Добавить бронирование', 
                  '🗑️ Удалить брони', '👥 Клиенты', '📊 Статистика', '↩️ Назад'].includes(text)) {
                 return;
@@ -306,7 +289,6 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
             if (!userStates[chatId]) return;
             
             if (userStates[chatId].step === 'date' && !text.includes('↩️')) {
-                // Проверяем формат даты
                 const dateMatch = text.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
                 
                 if (!dateMatch) {
@@ -330,10 +312,7 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
                 userStates[chatId].data.booking_date = date.toISOString();
                 userStates[chatId].step = 'client_name';
                 
-                bot.sendMessage(chatId, 
-                    '👤 *Введите имя клиента:*',
-                    { parse_mode: 'Markdown' }
-                );
+                bot.sendMessage(chatId, '👤 *Введите имя клиента:*', { parse_mode: 'Markdown' });
                 
             } else if (userStates[chatId].step === 'client_name') {
                 userStates[chatId].data.client_name = text;
@@ -367,7 +346,6 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
             }
         });
 
-        // === ПОДТВЕРЖДЕНИЕ ДОБАВЛЕНИЯ (ИСПРАВЛЕННЫЙ КОД) ===
         bot.onText(/✅ Подтвердить/, async (msg) => {
             const chatId = msg.chat.id;
             
@@ -379,13 +357,11 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
             const data = userStates[chatId].data;
             
             try {
-                // ВСЕГДА СОЗДАЕМ НОВОГО КЛИЕНТА, даже если номер телефона уже существует
                 const uniqueSuffix = Date.now().toString().slice(-6) + Math.random().toString(36).slice(2, 5);
                 const email = `client_${uniqueSuffix}@karcher.by`;
                 const tempPassword = 'temp' + Math.random().toString(36).slice(-8);
                 const hashedPassword = await bcrypt.hash(tempPassword, 10);
                 
-                // Используем оригинальное имя (без суффиксов)
                 const newClient = await pool.query(
                     `INSERT INTO clients (first_name, last_name, phone_number, email, password_hash) 
                      VALUES ($1, '', $2, $3, $4) 
@@ -394,9 +370,7 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
                 );
                 
                 const clientId = newClient.rows[0].id;
-                console.log('✅ Создан новый клиент ID:', clientId, 'Имя:', data.client_name, 'Телефон:', data.client_phone);
                 
-                // Создаем бронирование
                 const bookingResult = await pool.query(
                     `INSERT INTO bookings (client_id, service_name, booking_date) 
                      VALUES ($1, $2, $3) 
@@ -420,7 +394,6 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
                     }
                 );
                 
-                // Отправляем уведомление о новом бронировании
                 if (sendBookingNotification) {
                     await sendBookingNotification(booking);
                 }
@@ -437,14 +410,12 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
             }
         });
 
-        // === ОТМЕНА ===
         bot.onText(/❌ Отменить/, (msg) => {
             const chatId = msg.chat.id;
             delete userStates[chatId];
             bot.sendMessage(chatId, '❌ Действие отменено', { ...mainKeyboard });
         });
 
-        // === УДАЛИТЬ БРОНИРОВАНИЕ ===
         bot.onText(/🗑️ Удалить брони/, (msg) => {
             const chatId = msg.chat.id;
             
@@ -465,12 +436,10 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
             );
         });
 
-        // === ОБРАБОТКА УДАЛЕНИЯ (специальный обработчик) ===
         bot.on('message', async (msg) => {
             const chatId = msg.chat.id;
             const text = msg.text;
             
-            // Игнорируем команды кнопок
             if (['📋 Все бронирования', '📅 На сегодня', '➕ Добавить бронирование', 
                  '🗑️ Удалить брони', '👥 Клиенты', '📊 Статистика', '↩️ Назад',
                  '✅ Да', '❌ Нет', '✅ Подтвердить', '❌ Отменить'].includes(text)) {
@@ -487,7 +456,6 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
                 }
                 
                 try {
-                    // Проверяем существование
                     const checkResult = await pool.query(
                         `SELECT b.*, c.first_name, c.last_name, c.phone_number 
                          FROM bookings b 
@@ -534,7 +502,6 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
             }
         });
 
-        // === ПОДТВЕРЖДЕНИЕ УДАЛЕНИЯ ===
         bot.onText(/✅ Да/, async (msg) => {
             const chatId = msg.chat.id;
             
@@ -545,7 +512,6 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
             try {
                 const booking = userStates[chatId].deleteCandidate;
                 
-                // УДАЛЯЕМ из базы данных
                 const deleteResult = await pool.query('DELETE FROM bookings WHERE id = $1 RETURNING id', [booking.id]);
                 
                 if (deleteResult.rows.length === 0) {
@@ -580,7 +546,6 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
             delete userStates[chatId];
         });
 
-        // === ОТМЕНА УДАЛЕНИЯ ===
         bot.onText(/❌ Нет/, (msg) => {
             const chatId = msg.chat.id;
             if (userStates[chatId] && userStates[chatId].step === 'confirm_delete') {
@@ -589,7 +554,6 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
             }
         });
 
-        // === КЛИЕНТЫ ===
         bot.onText(/👥 Клиенты/, async (msg) => {
             const chatId = msg.chat.id;
             
@@ -635,7 +599,6 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
             }
         });
 
-        // === СТАТИСТИКА ===
         bot.onText(/📊 Статистика/, async (msg) => {
             const chatId = msg.chat.id;
             
@@ -674,10 +637,8 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
             }
         });
 
-        // === ФУНКЦИЯ ДЛЯ УВЕДОМЛЕНИЙ ===
         sendBookingNotification = async (bookingData) => {
             try {
-                // Получаем АКТУАЛЬНЫЕ данные клиента после обновления
                 const clientInfo = await pool.query(
                     'SELECT first_name, last_name, phone_number FROM clients WHERE id = $1',
                     [bookingData.client_id]
@@ -727,12 +688,18 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
 
 const saltRounds = 10;
 
-app.use(express.json()); 
-app.use(cors());
+app.use(express.json());
 
-// === ЭНДПОИНТЫ API ===
+const corsOptions = {
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+};
 
-// GET /clients
+app.use(cors(corsOptions));
+
+app.options('*', cors(corsOptions));
+
 app.get('/clients', async (req, res) => {
     try {
         const result = await pool.query('SELECT id, first_name, last_name, email, phone_number, address FROM clients ORDER BY id ASC');
@@ -743,7 +710,6 @@ app.get('/clients', async (req, res) => {
     }
 });
 
-// POST /clients (регистрация)
 app.post('/clients', async (req, res) => {
     const { first_name, last_name, email, phone_number, address, password } = req.body;
 
@@ -774,7 +740,6 @@ app.post('/clients', async (req, res) => {
     }
 });
 
-// GET /clients/search (для поиска по телефону)
 app.get('/clients/search', async (req, res) => {
     const { phone } = req.query;
     
@@ -799,7 +764,6 @@ app.get('/clients/search', async (req, res) => {
     }
 });
 
-// POST /login
 app.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
@@ -833,7 +797,6 @@ app.post('/login', async (req, res) => {
     }
 });
 
-// POST /find-or-create-client (ИСПРАВЛЕННЫЙ КОД - БЕЗ СУФФИКСОВ)
 app.post('/find-or-create-client', async (req, res) => {
     console.log('🔍 Создание нового клиента:', req.body);
     
@@ -846,13 +809,11 @@ app.post('/find-or-create-client', async (req, res) => {
     }
 
     try {
-        // ВСЕГДА СОЗДАЕМ НОВОГО КЛИЕНТА с уникальным email
         const uniqueSuffix = Date.now().toString().slice(-6) + Math.random().toString(36).slice(2, 5);
         const email = `client_${uniqueSuffix}@karcher.by`;
         const tempPassword = 'temp' + Math.random().toString(36).slice(-8);
         const hashedPassword = await bcrypt.hash(tempPassword, 10);
         
-        // Используем оригинальные имя и фамилию (без суффиксов)
         const newClient = await pool.query(
             `INSERT INTO clients (first_name, last_name, phone_number, email, password_hash) 
              VALUES ($1, $2, $3, $4, $5) 
@@ -872,7 +833,6 @@ app.post('/find-or-create-client', async (req, res) => {
     } catch (err) {
         console.error('❌ Ошибка при создании клиента:', err);
         
-        // Если ошибка из-за дубликата email (маловероятно с уникальным суффиксом), пробуем с другим email
         if (err.code === '23505' && err.constraint === 'clients_email_key') {
             const fallbackEmail = `client_${Date.now()}${Math.random().toString(36).slice(2)}@karcher.by`;
             const fallbackHashedPassword = await bcrypt.hash('temp' + Math.random().toString(36).slice(-8), 10);
@@ -906,13 +866,11 @@ app.post('/find-or-create-client', async (req, res) => {
     }
 });
 
-// POST /bookings
 app.post('/bookings', async (req, res) => {
     console.log('📨 POST /bookings запрос:', req.body);
     
     const { client_id, service_name, booking_date } = req.body; 
 
-    // Проверяем обязательные поля
     if (!client_id || !service_name || !booking_date) {
         console.error('❌ Отсутствуют обязательные поля:', { client_id, service_name, booking_date });
         return res.status(400).json({ 
@@ -923,7 +881,6 @@ app.post('/bookings', async (req, res) => {
     try {
         console.log('🔍 Проверяем клиента ID:', client_id);
         
-        // Проверяем существование клиента
         const clientCheck = await pool.query(
             'SELECT id FROM clients WHERE id = $1', 
             [client_id]
@@ -938,7 +895,6 @@ app.post('/bookings', async (req, res) => {
         
         console.log('✅ Клиент найден, создаем бронирование...');
         
-        // Создаем бронирование
         const result = await pool.query(
             `INSERT INTO bookings (client_id, service_name, booking_date) 
              VALUES ($1, $2, $3) 
@@ -949,7 +905,6 @@ app.post('/bookings', async (req, res) => {
         const booking = result.rows[0];
         console.log('✅ Бронирование создано:', booking);
 
-        // Отправляем уведомление в Telegram
         if (bot && sendBookingNotification) {
             try {
                 await sendBookingNotification(booking);
@@ -975,7 +930,6 @@ app.post('/bookings', async (req, res) => {
     }
 });
 
-// GET /bookings
 app.get('/bookings', async (req, res) => {
     try {
         const { serviceName } = req.query; 
@@ -1012,7 +966,6 @@ app.get('/bookings', async (req, res) => {
     }
 });
 
-// НОВЫЙ ЭНДПОИНТ: Все брони сгруппированные по услугам для сайта
 app.get('/all-bookings-by-service', async (req, res) => {
     try {
         const result = await pool.query(`
@@ -1039,7 +992,6 @@ app.get('/all-bookings-by-service', async (req, res) => {
     }
 });
 
-// НОВЫЙ ЭНДПОИНТ: Проверка доступности на конкретную дату
 app.get('/availability-by-date', async (req, res) => {
     const { date } = req.query;
     
@@ -1057,7 +1009,6 @@ app.get('/availability-by-date', async (req, res) => {
             GROUP BY b.service_name
         `, [date]);
         
-        // Лимиты для каждой услуги
         const limits = {
             'Аренда пылесоса Karcher Puzzi 8/1 C': 2,
             'Аренда пароочистителя Karcher SC 4 Deluxe': 1,
@@ -1066,7 +1017,6 @@ app.get('/availability-by-date', async (req, res) => {
         
         const availability = {};
         
-        // Инициализируем все услуги
         Object.keys(limits).forEach(service => {
             availability[service] = {
                 current: 0,
@@ -1075,7 +1025,6 @@ app.get('/availability-by-date', async (req, res) => {
             };
         });
         
-        // Заполняем фактическими данными
         result.rows.forEach(row => {
             if (availability[row.service_name]) {
                 availability[row.service_name].current = parseInt(row.count);
@@ -1094,7 +1043,6 @@ app.get('/availability-by-date', async (req, res) => {
     }
 });
 
-// GET /booking-stats
 app.get('/booking-stats', async (req, res) => {
     try {
         const result = await pool.query(`
@@ -1112,7 +1060,6 @@ app.get('/booking-stats', async (req, res) => {
     }
 });
 
-// GET /check-availability
 app.get('/check-availability', async (req, res) => {
     const { service_id, date } = req.query;
     
@@ -1146,7 +1093,6 @@ app.get('/check-availability', async (req, res) => {
     }
 });
 
-// Остальные эндпоинты (PUT, DELETE и т.д.)
 app.put('/clients/:id', async (req, res) => {
     const { id } = req.params;
     const { first_name, last_name, email, phone_number, address } = req.body;
@@ -1286,9 +1232,6 @@ app.delete('/bookings/:id', async (req, res) => {
     }
 });
 
-// === КОММЕНТАРИИ (упрощенная версия) ===
-
-// GET /comments - получить все одобренные комментарии
 app.get('/comments', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -1307,7 +1250,6 @@ app.get('/comments', async (req, res) => {
   }
 });
 
-// POST /comments - добавить комментарий
 app.post('/comments', async (req, res) => {
   const { client_id, comment_text, author_name, rating } = req.body;
   
@@ -1320,7 +1262,6 @@ app.post('/comments', async (req, res) => {
   }
   
   try {
-    // Проверяем, есть ли уже комментарий от этого пользователя
     if (client_id) {
       const existingComment = await pool.query(
         'SELECT id FROM comments WHERE client_id = $1 LIMIT 1',
@@ -1353,7 +1294,6 @@ app.post('/comments', async (req, res) => {
   }
 });
 
-// DELETE /comments/:id
 app.delete('/comments/:id', async (req, res) => {
   const { id } = req.params;
   
@@ -1378,7 +1318,6 @@ app.delete('/comments/:id', async (req, res) => {
   }
 });
 
-// НОВЫЙ ЭНДПОИНТ: Проверка дубликатов клиентов (для администратора)
 app.get('/check-duplicate-client', async (req, res) => {
     const { phone } = req.query;
     
@@ -1411,7 +1350,6 @@ app.get('/check-duplicate-client', async (req, res) => {
     }
 });
 
-// Проверка подключения к БД
 pool.connect((err, client, release) => {
     if (err) {
         console.error('❌ Error connecting to PostgreSQL:', err.stack);
