@@ -852,62 +852,6 @@ app.post('/find-or-create-client', async (req, res) => {
   }
 });
 
-// ============ НОВЫЙ ENDPOINT: ПРОВЕРКА ЛИМИТА БРОНИРОВАНИЙ НА АККАУНТ ============
-// GET /check-user-booking-limit
-app.get('/check-user-booking-limit', async (req, res) => {
-  const { client_id, service_name } = req.query;
-  
-  if (!client_id || !service_name) {
-    return res.status(400).json({ 
-      error: 'client_id и service_name обязательны' 
-    });
-  }
-  
-  try {
-    // Проверяем существование клиента
-    const clientCheck = await pool.query(
-      'SELECT id FROM clients WHERE id = $1',
-      [client_id]
-    );
-    
-    if (clientCheck.rows.length === 0) {
-      return res.status(404).json({ 
-        error: 'Клиент не найден' 
-      });
-    }
-    
-    // Считаем количество бронирований у этого клиента для выбранной услуги
-    const result = await pool.query(
-      `SELECT COUNT(*) as booking_count
-       FROM bookings
-       WHERE client_id = $1 
-         AND service_name = $2`,
-      [client_id, service_name]
-    );
-    
-    const currentCount = parseInt(result.rows[0].booking_count);
-    const limit = 2; // Лимит: 2 бронирования на аккаунт для каждой услуги
-    
-    res.json({
-      client_id: client_id,
-      service_name: service_name,
-      current_count: currentCount,
-      limit: limit,
-      can_book: currentCount < limit,
-      message: currentCount >= limit 
-        ? `Вы уже достигли максимального лимита (${limit}) бронирований для этой услуги`
-        : `У вас ${currentCount} из ${limit} возможных бронирований`
-    });
-    
-  } catch (err) {
-    console.error('Error checking user booking limit:', err);
-    res.status(500).json({ 
-      error: 'Внутренняя ошибка сервера', 
-      details: err.message 
-    });
-  }
-});
-
 // POST /bookings
 app.post('/bookings', async (req, res) => {
   console.log('POST /bookings запрос:', req.body);
