@@ -565,16 +565,17 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
         let message = '👥 *Последние клиенты:*\n\n';
         result.rows.forEach((client, index) => {
           message += `*${index + 1}. ${client.first_name} ${client.last_name}*\n`;
-          message += ` ${client.phone_number || '-'}\n`;
-          message += ` ${client.email || '-'}\n`;
-          message += ` Бронирований: ${client.booking_count}\n`;
-          message += ` ID: ${client.id}\n\n`;
+          message += `   📞 ${client.phone_number || '-'}\n`;  // Добавил отступ
+          message += `   📧 ${client.email || '-'}\n`;         // Добавил отступ
+          message += `   📊 Бронирований: ${client.booking_count}\n`;  // Добавил отступ
+          message += `   🆔 ID: ${client.id}\n\n`;
         });
         bot.sendMessage(chatId, message, {
           parse_mode: 'Markdown',
           ...backKeyboard
         });
       } catch (error) {
+        console.error('❌ Error fetching clients:', error);
         bot.sendMessage(chatId, '❌ Ошибка', { ...backKeyboard });
       }
     });
