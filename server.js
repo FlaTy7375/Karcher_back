@@ -26,11 +26,10 @@ const allowedOrigins = [
 const corsOptions = {
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
-    
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      console.log('🌐 CORS: Запрос с origin:', origin);
+      console.log('CORS: Запрос с origin:', origin);
       callback(null, true);
     }
   },
@@ -41,11 +40,7 @@ const corsOptions = {
   maxAge: 86400
 };
 
-// Упрощенная настройка CORS
 app.use(cors(corsOptions));
-
-// Явная обработка OPTIONS запросов
-app.options('*', cors(corsOptions));
 
 // ============ TELEGRAM BOT ============
 let bot = null;
@@ -56,7 +51,6 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
   try {
     bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
     const ADMIN_CHAT_ID = process.env.TELEGRAM_ADMIN_CHAT_ID;
-    
     console.log('🤖 Telegram bot initialized with button interface');
 
     const mainKeyboard = {
@@ -111,13 +105,11 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
     bot.onText(/\/start/, (msg) => {
       const chatId = msg.chat.id;
       const isAdmin = chatId.toString() === ADMIN_CHAT_ID;
-      
       delete userStates[chatId];
-      
       if (isAdmin) {
         bot.sendMessage(chatId,
           '👋 *Добро пожаловать в панель управления бронированиями!*\n\n' +
-          'Выберите действие на клавиатуре ниже 👇',
+          'Выберите действие на клавиатуре ниже',
           {
             parse_mode: 'Markdown',
             ...mainKeyboard
@@ -142,12 +134,10 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
     // === Все бронирования ===
     bot.onText(/📋 Все бронирования/, async (msg) => {
       const chatId = msg.chat.id;
-      
       if (chatId.toString() !== ADMIN_CHAT_ID) {
         bot.sendMessage(chatId, '⛔ Нет доступа', { ...backKeyboard });
         return;
       }
-      
       try {
         const result = await pool.query(`
           SELECT b.*, c.first_name, c.last_name, c.phone_number
@@ -177,7 +167,6 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
         });
 
         let message = '📋 *Все бронирования по услугам:*\n\n';
-        
         const serviceOrder = [
           'Аренда пылесоса Karcher Puzzi 8/1 C',
           'Аренда пароочистителя Karcher SC 4 Deluxe',
@@ -190,12 +179,10 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
             let serviceEmoji = '🧹';
             if (serviceName.includes('пароочистителя')) serviceEmoji = '💨';
             if (serviceName.includes('мойки')) serviceEmoji = '💦';
-            
             message += `${serviceEmoji} *${serviceName}:*\n`;
-            
             bookings.forEach((booking, index) => {
               const date = new Date(booking.booking_date).toLocaleDateString('ru-RU');
-              message += `   ${index + 1}. 📅 ${date} | 👤 ${booking.first_name || '-'} ${booking.last_name || ''} | 📞 ${booking.phone_number || '-'} | 🆔 *${booking.id}*\n`;
+              message += ` ${index + 1}. 📅 ${date} | 👤 ${booking.first_name || '-'} ${booking.last_name || ''} | 📞 ${booking.phone_number || '-'} | 🆔 *${booking.id}*\n`;
             });
             message += '\n';
           }
@@ -206,7 +193,7 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
           ...backKeyboard
         });
       } catch (error) {
-        console.error('❌ Error:', error);
+        console.error('Error:', error);
         bot.sendMessage(chatId, '❌ Ошибка при получении данных', { ...backKeyboard });
       }
     });
@@ -214,12 +201,10 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
     // === На сегодня ===
     bot.onText(/📅 На сегодня/, async (msg) => {
       const chatId = msg.chat.id;
-      
       if (chatId.toString() !== ADMIN_CHAT_ID) {
         bot.sendMessage(chatId, '⛔ Нет доступа', { ...backKeyboard });
         return;
       }
-      
       try {
         const today = new Date().toISOString().split('T')[0];
         const result = await pool.query(`
@@ -239,20 +224,19 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
         }
 
         let message = `📅 *Бронирования на сегодня (${today}):*\n\n`;
-        
         result.rows.forEach((booking, index) => {
           const time = new Date(booking.booking_date).toLocaleTimeString('ru-RU', {
             hour: '2-digit',
             minute: '2-digit'
           });
           const serviceEmoji = booking.service_name.includes('пылесоса') ? '🧹' :
-                              booking.service_name.includes('пароочистителя') ? '💨' : '💦';
+            booking.service_name.includes('пароочистителя') ? '💨' : '💦';
           
           message += `*${index + 1}. ${serviceEmoji} ${booking.service_name}*\n`;
-          message += `   ⏰ ${time}\n`;
-          message += `   👤 ${booking.first_name || '-'} ${booking.last_name || ''}\n`;
-          message += `   📞 ${booking.phone_number || '-'}\n`;
-          message += `   🆔 *ID: ${booking.id}*\n\n`;
+          message += ` ${time}\n`;
+          message += ` 👤 ${booking.first_name || '-'} ${booking.last_name || ''}\n`;
+          message += ` 📞 ${booking.phone_number || '-'}\n`;
+          message += ` 🆔 *ID: ${booking.id}*\n\n`;
         });
 
         bot.sendMessage(chatId, message, {
@@ -260,7 +244,6 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
           ...backKeyboard
         });
       } catch (error) {
-        console.error('❌ Error:', error);
         bot.sendMessage(chatId, '❌ Ошибка', { ...backKeyboard });
       }
     });
@@ -268,17 +251,14 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
     // === Добавить бронирование ===
     bot.onText(/➕ Добавить бронирование/, (msg) => {
       const chatId = msg.chat.id;
-      
       if (chatId.toString() !== ADMIN_CHAT_ID) {
         bot.sendMessage(chatId, '⛔ Нет доступа', { ...backKeyboard });
         return;
       }
-      
       userStates[chatId] = {
         step: 'service',
         data: {}
       };
-      
       bot.sendMessage(chatId,
         '🎯 *Выберите услугу для бронирования:*',
         {
@@ -292,21 +272,17 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
     bot.onText(/🧹 Пылесос Puzzi 8\/1 C|💨 Пароочиститель SC 4|💦 Мойка K 5/, (msg) => {
       const chatId = msg.chat.id;
       const service = msg.text;
-      
       if (!userStates[chatId] || userStates[chatId].step !== 'service') {
         bot.sendMessage(chatId, 'Начните с команды "➕ Добавить бронирование"', { ...backKeyboard });
         return;
       }
-      
       const serviceMap = {
         '🧹 Пылесос Puzzi 8/1 C': 'Аренда пылесоса Karcher Puzzi 8/1 C',
         '💨 Пароочиститель SC 4': 'Аренда пароочистителя Karcher SC 4 Deluxe',
         '💦 Мойка K 5': 'Аренда мойки высокого давления Karcher K 5 Full Control'
       };
-      
       userStates[chatId].data.service_name = serviceMap[service];
       userStates[chatId].step = 'date';
-      
       bot.sendMessage(chatId,
         '📅 *Введите дату бронирования:*\n\n' +
         '_Формат: ДД.ММ.ГГГГ (например: 25.12.2024)_',
@@ -321,17 +297,14 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
     bot.on('message', async (msg) => {
       const chatId = msg.chat.id;
       const text = msg.text;
-      
       if (['📋 Все бронирования', '📅 На сегодня', '➕ Добавить бронирование',
-           '🗑️ Удалить брони', '👥 Клиенты', '📊 Статистика', '↩️ Назад'].includes(text)) {
+        '🗑️ Удалить брони', '👥 Клиенты', '📊 Статистика', '↩️ Назад'].includes(text)) {
         return;
       }
-      
       if (!userStates[chatId]) return;
 
       if (userStates[chatId].step === 'date' && !text.includes('↩️')) {
         const dateMatch = text.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
-        
         if (!dateMatch) {
           bot.sendMessage(chatId,
             '❌ *Неверный формат даты!*\n\n' +
@@ -341,37 +314,28 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
           );
           return;
         }
-        
         const [_, day, month, year] = dateMatch;
         const date = new Date(year, month - 1, day);
-        
         if (isNaN(date.getTime())) {
           bot.sendMessage(chatId, '❌ Неверная дата!');
           return;
         }
-        
         userStates[chatId].data.booking_date = date.toISOString();
         userStates[chatId].step = 'client_name';
-        
         bot.sendMessage(chatId, '👤 *Введите имя клиента:*', { parse_mode: 'Markdown' });
-        
       } else if (userStates[chatId].step === 'client_name') {
         userStates[chatId].data.client_name = text;
         userStates[chatId].step = 'client_phone';
-        
         bot.sendMessage(chatId,
           '📞 *Введите телефон клиента:*\n\n' +
           '_Пример: +375291234567_',
           { parse_mode: 'Markdown' }
         );
-        
       } else if (userStates[chatId].step === 'client_phone') {
         userStates[chatId].data.client_phone = text;
         userStates[chatId].step = 'confirm';
-        
         const date = new Date(userStates[chatId].data.booking_date);
         const dateStr = date.toLocaleDateString('ru-RU');
-        
         bot.sendMessage(chatId,
           '📋 *Проверьте данные:*\n\n' +
           `*Услуга:* ${userStates[chatId].data.service_name}\n` +
@@ -390,14 +354,11 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
     // === Подтверждение ===
     bot.onText(/✅ Подтвердить/, async (msg) => {
       const chatId = msg.chat.id;
-      
       if (!userStates[chatId] || userStates[chatId].step !== 'confirm') {
         bot.sendMessage(chatId, 'Сессия истекла', { ...mainKeyboard });
         return;
       }
-      
       const data = userStates[chatId].data;
-      
       try {
         const uniqueSuffix = Date.now().toString().slice(-6) + Math.random().toString(36).slice(2, 5);
         const email = `client_${uniqueSuffix}@karcher.by`;
@@ -442,7 +403,7 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
 
         delete userStates[chatId];
       } catch (error) {
-        console.error('❌ Error adding booking:', error);
+        console.error('Error adding booking:', error);
         bot.sendMessage(chatId,
           `❌ Ошибка при создании бронирования:\n${error.message}`,
           { ...mainKeyboard }
@@ -461,14 +422,11 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
     // === Удалить бронирование ===
     bot.onText(/🗑️ Удалить брони/, (msg) => {
       const chatId = msg.chat.id;
-      
       if (chatId.toString() !== ADMIN_CHAT_ID) {
         bot.sendMessage(chatId, '⛔ Нет доступа', { ...backKeyboard });
         return;
       }
-      
       userStates[chatId] = { step: 'delete_ask_id' };
-      
       bot.sendMessage(chatId,
         '🗑️ *Удаление бронирования*\n\n' +
         'Введите ID бронирования для удаления:',
@@ -483,22 +441,18 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
     bot.on('message', async (msg) => {
       const chatId = msg.chat.id;
       const text = msg.text;
-      
       if (['📋 Все бронирования', '📅 На сегодня', '➕ Добавить бронирование',
-           '🗑️ Удалить брони', '👥 Клиенты', '📊 Статистика', '↩️ Назад',
-           '✅ Да', '❌ Нет', '✅ Подтвердить', '❌ Отменить'].includes(text)) {
+        '🗑️ Удалить брони', '👥 Клиенты', '📊 Статистика', '↩️ Назад',
+        '✅ Да', '❌ Нет', '✅ Подтвердить', '❌ Отменить'].includes(text)) {
         return;
       }
-      
       if (userStates[chatId] && userStates[chatId].step === 'delete_ask_id') {
         const bookingId = parseInt(text);
-        
         if (isNaN(bookingId)) {
           bot.sendMessage(chatId, '❌ Введите число (ID бронирования)', { ...mainKeyboard });
           delete userStates[chatId];
           return;
         }
-        
         try {
           const checkResult = await pool.query(
             `SELECT b.*, c.first_name, c.last_name, c.phone_number
@@ -507,7 +461,6 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
              WHERE b.id = $1`,
             [bookingId]
           );
-          
           if (checkResult.rows.length === 0) {
             bot.sendMessage(chatId,
               `❌ Бронирование с ID *${bookingId}* не найдено`,
@@ -516,12 +469,9 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
             delete userStates[chatId];
             return;
           }
-          
           const booking = checkResult.rows[0];
           userStates[chatId].deleteCandidate = booking;
-          
           const date = new Date(booking.booking_date).toLocaleDateString('ru-RU');
-          
           bot.sendMessage(chatId,
             `⚠️ *Подтвердите удаление:*\n\n` +
             `*Услуга:* ${booking.service_name}\n` +
@@ -535,10 +485,9 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
               ...yesNoKeyboard
             }
           );
-          
           userStates[chatId].step = 'confirm_delete';
         } catch (error) {
-          console.error('❌ Error checking booking:', error);
+          console.error('Error checking booking:', error);
           bot.sendMessage(chatId, '❌ Ошибка при проверке бронирования', { ...mainKeyboard });
           delete userStates[chatId];
         }
@@ -548,24 +497,18 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
     // === Подтверждение удаления ===
     bot.onText(/✅ Да/, async (msg) => {
       const chatId = msg.chat.id;
-      
       if (!userStates[chatId] || userStates[chatId].step !== 'confirm_delete') {
         return;
       }
-      
       try {
         const booking = userStates[chatId].deleteCandidate;
-        
         const deleteResult = await pool.query('DELETE FROM bookings WHERE id = $1 RETURNING id', [booking.id]);
-        
         if (deleteResult.rows.length === 0) {
           bot.sendMessage(chatId, '❌ Бронирование не найдено при удалении', { ...mainKeyboard });
           delete userStates[chatId];
           return;
         }
-        
         const date = new Date(booking.booking_date).toLocaleDateString('ru-RU');
-        
         bot.sendMessage(chatId,
           `✅ *Бронирование удалено!*\n\n` +
           `*Услуга:* ${booking.service_name}\n` +
@@ -573,19 +516,17 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
           `*Клиент:* ${booking.first_name || '-'} ${booking.last_name || ''}\n` +
           `*Телефон:* ${booking.phone_number || '-'}\n` +
           `*ID:* ${booking.id}\n\n` +
-          `ℹ️ *Для обновления данных на сайте перезагрузите страницу*`,
+          `Для обновления данных на сайте перезагрузите страницу`,
           {
             parse_mode: 'Markdown',
             ...mainKeyboard
           }
         );
-        
         console.log(`✅ Бронирование ID ${booking.id} удалено через Telegram`);
       } catch (error) {
-        console.error('❌ Error deleting booking:', error);
+        console.error('Error deleting booking:', error);
         bot.sendMessage(chatId, '❌ Ошибка при удалении бронирования', { ...mainKeyboard });
       }
-      
       delete userStates[chatId];
     });
 
@@ -601,12 +542,10 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
     // === Клиенты ===
     bot.onText(/👥 Клиенты/, async (msg) => {
       const chatId = msg.chat.id;
-      
       if (chatId.toString() !== ADMIN_CHAT_ID) {
         bot.sendMessage(chatId, '⛔ Нет доступа', { ...backKeyboard });
         return;
       }
-      
       try {
         const result = await pool.query(`
           SELECT c.*, COUNT(b.id) as booking_count
@@ -616,7 +555,6 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
           ORDER BY c.id DESC
           LIMIT 10
         `);
-        
         if (result.rows.length === 0) {
           bot.sendMessage(chatId, '👥 *Нет клиентов в базе*', {
             parse_mode: 'Markdown',
@@ -624,23 +562,19 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
           });
           return;
         }
-        
         let message = '👥 *Последние клиенты:*\n\n';
-        
         result.rows.forEach((client, index) => {
           message += `*${index + 1}. ${client.first_name} ${client.last_name}*\n`;
-          message += `   📞 ${client.phone_number || '-'}\n`;
-          message += `   📧 ${client.email || '-'}\n`;
-          message += `   📊 Бронирований: ${client.booking_count}\n`;
-          message += `   🆔 ID: ${client.id}\n\n`;
+          message += ` ${client.phone_number || '-'}\n`;
+          message += ` ${client.email || '-'}\n`;
+          message += ` Бронирований: ${client.booking_count}\n`;
+          message += ` ID: ${client.id}\n\n`;
         });
-        
         bot.sendMessage(chatId, message, {
           parse_mode: 'Markdown',
           ...backKeyboard
         });
       } catch (error) {
-        console.error('❌ Error:', error);
         bot.sendMessage(chatId, '❌ Ошибка', { ...backKeyboard });
       }
     });
@@ -648,12 +582,10 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
     // === Статистика ===
     bot.onText(/📊 Статистика/, async (msg) => {
       const chatId = msg.chat.id;
-      
       if (chatId.toString() !== ADMIN_CHAT_ID) {
         bot.sendMessage(chatId, '⛔ Нет доступа', { ...backKeyboard });
         return;
       }
-      
       try {
         const today = new Date().toISOString().split('T')[0];
         const [todayStats, monthStats, popularServices, totalClients] = await Promise.all([
@@ -668,7 +600,7 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
           `📅 *Сегодня:* ${todayStats.rows[0].count}\n` +
           `📈 *Этот месяц:* ${monthStats.rows[0].count}\n` +
           `👥 *Всего клиентов:* ${totalClients.rows[0].count}\n\n` +
-          '🏆 *Популярные услуги:*\n' +
+          '*Популярные услуги:*\n' +
           popularServices.rows.map((service, index) =>
             `${index + 1}. ${service.service_name}: ${service.count}`
           ).join('\n');
@@ -678,7 +610,7 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
           ...backKeyboard
         });
       } catch (error) {
-        console.error('❌ Error fetching stats:', error);
+        console.error('Error fetching stats:', error);
         bot.sendMessage(chatId, '❌ Ошибка', { ...backKeyboard });
       }
     });
@@ -690,19 +622,15 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
           'SELECT first_name, last_name, phone_number FROM clients WHERE id = $1',
           [bookingData.client_id]
         );
-        
         let clientName = 'Не указан';
         let clientPhone = 'Не указан';
-        
         if (clientInfo.rows.length > 0) {
           const client = clientInfo.rows[0];
           clientName = `${client.first_name || ''} ${client.last_name || ''}`.trim() || 'Не указан';
           clientPhone = client.phone_number || 'Не указан';
         }
-        
         const date = new Date(bookingData.booking_date).toLocaleDateString('ru-RU');
         const time = new Date().toLocaleTimeString('ru-RU');
-        
         const message =
           `🆕 *Новое бронирование!*\n\n` +
           `*Услуга:* ${bookingData.service_name}\n` +
@@ -711,12 +639,10 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
           `*Телефон:* ${clientPhone}\n` +
           `*Время создания:* ${time}\n` +
           `*ID:* ${bookingData.id}`;
-        
         await bot.sendMessage(ADMIN_CHAT_ID, message, {
           parse_mode: 'Markdown',
           ...mainKeyboard
         });
-        
         console.log('✅ Telegram notification sent for booking ID:', bookingData.id);
       } catch (error) {
         console.error('❌ Error sending Telegram notification:', error.message);
@@ -735,10 +661,9 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
 const saltRounds = 10;
 
 app.use(express.json());
-
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} ${req.method} ${req.url}`);
-  console.log('🌐 Origin:', req.headers.origin);
+  console.log('Origin:', req.headers.origin);
   next();
 });
 
@@ -753,7 +678,7 @@ app.get('/clients', async (req, res) => {
     const result = await pool.query('SELECT id, first_name, last_name, email, phone_number, address FROM clients ORDER BY id ASC');
     res.json(result.rows);
   } catch (err) {
-    console.error('❌ Error fetching clients:', err);
+    console.error('Error fetching clients:', err);
     res.status(500).json({ error: 'Internal server error', details: err.message });
   }
 });
@@ -761,13 +686,11 @@ app.get('/clients', async (req, res) => {
 // POST /clients (регистрация)
 app.post('/clients', async (req, res) => {
   const { first_name, last_name, email, phone_number, address, password } = req.body;
-  
   if (!first_name || !last_name || !email || !password) {
     return res.status(400).json({
       error: 'Missing required fields: first_name, last_name, email, password'
     });
   }
-  
   try {
     const hashedPassword = await bcrypt.hash(password, saltRounds);
     const result = await pool.query(
@@ -781,7 +704,7 @@ app.post('/clients', async (req, res) => {
     if (err.code === '23505' && err.constraint === 'clients_email_key') {
       return res.status(409).json({ error: 'Email already exists.' });
     }
-    console.error('❌ Error adding client:', err);
+    console.error('Error adding client:', err);
     res.status(500).json({ error: 'Internal server error', details: err.message });
   }
 });
@@ -789,24 +712,20 @@ app.post('/clients', async (req, res) => {
 // GET /clients/search
 app.get('/clients/search', async (req, res) => {
   const { phone } = req.query;
-  
   if (!phone) {
     return res.status(400).json({ error: 'Phone number is required' });
   }
-  
   try {
     const result = await pool.query(
       'SELECT id, first_name, last_name, phone_number FROM clients WHERE phone_number = $1 LIMIT 1',
       [phone]
     );
-    
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Client not found' });
     }
-    
     res.json(result.rows[0]);
   } catch (err) {
-    console.error('❌ Error searching client:', err);
+    console.error('Error searching client:', err);
     res.status(500).json({ error: 'Internal server error', details: err.message });
   }
 });
@@ -814,76 +733,62 @@ app.get('/clients/search', async (req, res) => {
 // POST /login
 app.post('/login', async (req, res) => {
   const { email, password } = req.body;
-  
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required.' });
   }
-  
   try {
     const user = await pool.query(
       'SELECT id, first_name, last_name, email, password_hash FROM clients WHERE email = $1',
       [email]
     );
-    
     if (user.rows.length === 0) {
       return res.status(401).json({ error: 'Invalid email or password.' });
     }
-    
     const client = user.rows[0];
     const passwordMatch = await bcrypt.compare(password, client.password_hash);
-    
     if (!passwordMatch) {
       return res.status(401).json({ error: 'Invalid email or password.' });
     }
-    
     delete client.password_hash;
     res.json({ message: 'Login successful', client });
   } catch (err) {
-    console.error('❌ Error during login:', err);
+    console.error('Error during login:', err);
     res.status(500).json({ error: 'Internal server error', details: err.message });
   }
 });
 
 // POST /find-or-create-client
 app.post('/find-or-create-client', async (req, res) => {
-  console.log('🔍 Создание нового клиента:', req.body);
-  
+  console.log('Создание нового клиента:', req.body);
   const { first_name, last_name, phone_number } = req.body;
-  
   if (!first_name || !phone_number) {
     return res.status(400).json({
       error: 'Имя и телефон обязательны'
     });
   }
-  
   try {
     const uniqueSuffix = Date.now().toString().slice(-6) + Math.random().toString(36).slice(2, 5);
     const email = `client_${uniqueSuffix}@karcher.by`;
     const tempPassword = 'temp' + Math.random().toString(36).slice(-8);
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
-    
     const newClient = await pool.query(
       `INSERT INTO clients (first_name, last_name, phone_number, email, password_hash)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING id, first_name, last_name, phone_number`,
       [first_name, last_name || '', phone_number, email, hashedPassword]
     );
-    
     const clientId = newClient.rows[0].id;
     console.log('✅ Создан новый клиент ID:', clientId, 'Имя:', first_name, 'Телефон:', phone_number);
-    
     res.status(200).json({
       client_id: clientId,
       is_new: true,
       message: 'Создан новый клиент'
     });
   } catch (err) {
-    console.error('❌ Ошибка при создании клиента:', err);
-    
+    console.error('Ошибка при создании клиента:', err);
     if (err.code === '23505' && err.constraint === 'clients_email_key') {
       const fallbackEmail = `client_${Date.now()}${Math.random().toString(36).slice(2)}@karcher.by`;
       const fallbackHashedPassword = await bcrypt.hash('temp' + Math.random().toString(36).slice(-8), 10);
-      
       try {
         const fallbackClient = await pool.query(
           `INSERT INTO clients (first_name, last_name, phone_number, email, password_hash)
@@ -891,14 +796,13 @@ app.post('/find-or-create-client', async (req, res) => {
            RETURNING id`,
           [first_name, last_name || '', phone_number, fallbackEmail, fallbackHashedPassword]
         );
-        
         res.status(200).json({
           client_id: fallbackClient.rows[0].id,
           is_new: true,
           message: 'Создан новый клиент (fallback)'
         });
       } catch (fallbackErr) {
-        console.error('❌ Ошибка при создании клиента (fallback):', fallbackErr);
+        console.error('Ошибка при создании клиента (fallback):', fallbackErr);
         res.status(500).json({
           error: 'Ошибка сервера',
           details: fallbackErr.message
@@ -915,44 +819,35 @@ app.post('/find-or-create-client', async (req, res) => {
 
 // POST /bookings
 app.post('/bookings', async (req, res) => {
-  console.log('📨 POST /bookings запрос:', req.body);
-  
+  console.log('POST /bookings запрос:', req.body);
   const { client_id, service_name, booking_date } = req.body;
-  
   if (!client_id || !service_name || !booking_date) {
     console.error('❌ Отсутствуют обязательные поля:', { client_id, service_name, booking_date });
     return res.status(400).json({
       error: 'Отсутствуют обязательные поля: client_id, service_name, booking_date'
     });
   }
-  
   try {
-    console.log('🔍 Проверяем клиента ID:', client_id);
-    
+    console.log('Проверяем клиента ID:', client_id);
     const clientCheck = await pool.query(
       'SELECT id FROM clients WHERE id = $1',
       [client_id]
     );
-    
     if (clientCheck.rows.length === 0) {
       console.error('❌ Клиент не найден:', client_id);
       return res.status(404).json({
         error: 'Клиент не найден'
       });
     }
-    
     console.log('✅ Клиент найден, создаем бронирование...');
-    
     const result = await pool.query(
       `INSERT INTO bookings (client_id, service_name, booking_date)
        VALUES ($1, $2, $3)
        RETURNING id, client_id, service_name, booking_date`,
       [client_id, service_name, booking_date]
     );
-    
     const booking = result.rows[0];
     console.log('✅ Бронирование создано:', booking);
-    
     if (bot && sendBookingNotification) {
       try {
         await sendBookingNotification(booking);
@@ -961,7 +856,6 @@ app.post('/bookings', async (req, res) => {
         console.error('⚠️ Ошибка Telegram уведомления:', tgError.message);
       }
     }
-    
     res.status(201).json(booking);
   } catch (err) {
     console.error('❌ Ошибка при создании бронирования:', err);
@@ -969,7 +863,6 @@ app.post('/bookings', async (req, res) => {
       code: err.code,
       message: err.message
     });
-    
     res.status(500).json({
       error: 'Внутренняя ошибка сервера',
       message: err.message
@@ -997,17 +890,15 @@ app.get('/bookings', async (req, res) => {
       JOIN clients c ON b.client_id = c.id
     `;
     const queryParams = [];
-    
     if (serviceName) {
       query += ` WHERE b.service_name ILIKE $1`;
       queryParams.push(`%${serviceName}%`);
     }
-    
     query += ` ORDER BY b.booking_date DESC`;
     const result = await pool.query(query, queryParams);
     res.json(result.rows);
   } catch (err) {
-    console.error('❌ Error fetching bookings:', err);
+    console.error('Error fetching bookings:', err);
     res.status(500).json({ error: 'Internal server error', details: err.message });
   }
 });
@@ -1015,7 +906,7 @@ app.get('/bookings', async (req, res) => {
 // GET /comments
 app.get('/comments', async (req, res) => {
   try {
-    console.log('📝 Получение комментариев из базы данных');
+    console.log('Получение комментариев из базы данных');
     const result = await pool.query(`
       SELECT id, client_id, author_name, comment_text,
              TO_CHAR(created_at, 'DD.MM.YYYY') as created_at,
@@ -1024,11 +915,10 @@ app.get('/comments', async (req, res) => {
       WHERE is_approved = true
       ORDER BY created_at DESC
     `);
-    
-    console.log(`✅ Найдено ${result.rows.length} комментариев`);
+    console.log(`Найдено ${result.rows.length} комментариев`);
     res.json(result.rows);
   } catch (err) {
-    console.error('❌ Error fetching comments:', err);
+    console.error('Error fetching comments:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1036,31 +926,25 @@ app.get('/comments', async (req, res) => {
 // POST /comments
 app.post('/comments', async (req, res) => {
   const { client_id, comment_text, author_name, rating } = req.body;
-  
-  console.log('📝 POST /comments запрос:', req.body);
-  
+  console.log('POST /comments запрос:', req.body);
   if (!comment_text || comment_text.trim().length === 0) {
     return res.status(400).json({ error: 'Текст комментария обязателен' });
   }
-  
   if (rating && (rating < 1 || rating > 5)) {
     return res.status(400).json({ error: 'Рейтинг должен быть от 1 до 5' });
   }
-  
   try {
     if (client_id) {
       const existingComment = await pool.query(
         'SELECT id FROM comments WHERE client_id = $1 LIMIT 1',
         [client_id]
       );
-      
       if (existingComment.rows.length > 0) {
         return res.status(400).json({
           error: 'Вы уже оставляли комментарий. Удалите старый чтобы добавить новый.'
         });
       }
     }
-    
     const result = await pool.query(
       `INSERT INTO comments (client_id, author_name, comment_text, rating, is_approved)
        VALUES ($1, $2, $3, $4, true)
@@ -1068,15 +952,13 @@ app.post('/comments', async (req, res) => {
                  TO_CHAR(created_at, 'DD.MM.YYYY') as created_at, rating`,
       [client_id || null, author_name || 'Аноним', comment_text.trim(), rating || null]
     );
-    
-    console.log('✅ Комментарий добавлен с ID:', result.rows[0].id);
-    
+    console.log('Комментарий добавлен с ID:', result.rows[0].id);
     res.status(201).json({
       ...result.rows[0],
       message: 'Комментарий успешно добавлен!'
     });
   } catch (err) {
-    console.error('❌ Error adding comment:', err);
+    console.error('Error adding comment:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1084,27 +966,22 @@ app.post('/comments', async (req, res) => {
 // DELETE /comments/:id
 app.delete('/comments/:id', async (req, res) => {
   const { id } = req.params;
-  
-  console.log('🗑️ DELETE /comments запрос для ID:', id);
-  
+  console.log('DELETE /comments запрос для ID:', id);
   try {
     const result = await pool.query(
       'DELETE FROM comments WHERE id = $1 RETURNING id',
       [id]
     );
-    
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Комментарий не найден' });
     }
-    
-    console.log('✅ Комментарий удален с ID:', result.rows[0].id);
-    
+    console.log('Комментарий удален с ID:', result.rows[0].id);
     res.json({
       message: 'Комментарий удален',
       deletedId: result.rows[0].id
     });
   } catch (err) {
-    console.error('❌ Error deleting comment:', err);
+    console.error('Error deleting comment:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1130,7 +1007,7 @@ app.get('/all-bookings-by-service', async (req, res) => {
     `);
     res.json(result.rows);
   } catch (err) {
-    console.error('❌ Error fetching all bookings by service:', err);
+    console.error('Error fetching all bookings by service:', err);
     res.status(500).json({ error: 'Internal server error', details: err.message });
   }
 });
@@ -1138,11 +1015,9 @@ app.get('/all-bookings-by-service', async (req, res) => {
 // GET /availability-by-date
 app.get('/availability-by-date', async (req, res) => {
   const { date } = req.query;
-  
   if (!date) {
     return res.status(400).json({ error: 'Date parameter is required' });
   }
-  
   try {
     const result = await pool.query(`
       SELECT
@@ -1152,15 +1027,12 @@ app.get('/availability-by-date', async (req, res) => {
       WHERE DATE(b.booking_date) = $1
       GROUP BY b.service_name
     `, [date]);
-    
     const limits = {
       'Аренда пылесоса Karcher Puzzi 8/1 C': 2,
       'Аренда пароочистителя Karcher SC 4 Deluxe': 1,
       'Аренда мойки высокого давления Karcher K 5 Full Control': 1
     };
-    
     const availability = {};
-    
     Object.keys(limits).forEach(service => {
       availability[service] = {
         current: 0,
@@ -1168,20 +1040,18 @@ app.get('/availability-by-date', async (req, res) => {
         available: true
       };
     });
-    
     result.rows.forEach(row => {
       if (availability[row.service_name]) {
         availability[row.service_name].current = parseInt(row.count);
         availability[row.service_name].available = parseInt(row.count) < availability[row.service_name].limit;
       }
     });
-    
     res.json({
       date: date,
       availability: availability
     });
   } catch (err) {
-    console.error('❌ Error checking availability by date:', err);
+    console.error('Error checking availability by date:', err);
     res.status(500).json({ error: 'Internal server error', details: err.message });
   }
 });
@@ -1189,7 +1059,6 @@ app.get('/availability-by-date', async (req, res) => {
 // GET /check-availability
 app.get('/check-availability', async (req, res) => {
   const { service_id, date } = req.query;
-  
   try {
     const result = await pool.query(`
       SELECT COUNT(*) as booking_count
@@ -1197,16 +1066,13 @@ app.get('/check-availability', async (req, res) => {
       WHERE service_name = $1
         AND DATE(booking_date) = $2
     `, [service_id, date]);
-    
     const limits = {
       'Аренда пылесоса Karcher Puzzi 8/1 C': 2,
       'Аренда пароочистителя Karcher SC 4 Deluxe': 1,
       'Аренда мойки высокого давления Karcher K 5 Full Control': 1
     };
-    
     const limit = limits[service_id] || 1;
     const count = parseInt(result.rows[0].booking_count);
-    
     res.json({
       available: count < limit,
       current: count,
@@ -1214,7 +1080,7 @@ app.get('/check-availability', async (req, res) => {
       date: date
     });
   } catch (err) {
-    console.error('❌ Error checking availability:', err);
+    console.error('Error checking availability:', err);
     res.status(500).json({ error: 'Internal server error', details: err.message });
   }
 });
@@ -1223,24 +1089,20 @@ app.get('/check-availability', async (req, res) => {
 app.put('/clients/:id', async (req, res) => {
   const { id } = req.params;
   const { first_name, last_name, email, phone_number, address } = req.body;
-  
   try {
     const result = await pool.query(
       'UPDATE clients SET first_name = $1, last_name = $2, email = $3, phone_number = $4, address = $5 WHERE id = $6 RETURNING id, first_name, last_name, email',
       [first_name, last_name, email, phone_number, address, id]
     );
-    
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Client not found' });
     }
-    
     res.json(result.rows[0]);
   } catch (err) {
     if (err.code === '23505' && err.constraint === 'clients_email_key') {
       return res.status(409).json({ error: 'Email already exists for another client.' });
     }
-    
-    console.error(`❌ Error updating client with ID ${id}:`, err);
+    console.error(`Error updating client with ID ${id}:`, err);
     res.status(500).json({ error: 'Internal server error', details: err.message });
   }
 });
@@ -1248,21 +1110,17 @@ app.put('/clients/:id', async (req, res) => {
 // DELETE /clients/:id
 app.delete('/clients/:id', async (req, res) => {
   const { id } = req.params;
-  
   try {
     const result = await pool.query('DELETE FROM clients WHERE id = $1 RETURNING id', [id]);
-    
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Client not found' });
     }
-    
     res.status(204).send();
   } catch (err) {
     if (err.code === '23503' && err.constraint === 'bookings_client_id_fkey') {
       return res.status(409).json({ error: 'Cannot delete client with existing bookings.' });
     }
-    
-    console.error(`❌ Error deleting client with ID ${id}:`, err);
+    console.error(`Error deleting client with ID ${id}:`, err);
     res.status(500).json({ error: 'Internal server error', details: err.message });
   }
 });
@@ -1270,7 +1128,6 @@ app.delete('/clients/:id', async (req, res) => {
 // GET /bookings/:id
 app.get('/bookings/:id', async (req, res) => {
   const { id } = req.params;
-  
   try {
     const result = await pool.query(`
       SELECT
@@ -1287,14 +1144,12 @@ app.get('/bookings/:id', async (req, res) => {
       JOIN clients c ON b.client_id = c.id
       WHERE b.id = $1
     `, [id]);
-    
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Booking not found' });
     }
-    
     res.json(result.rows[0]);
   } catch (err) {
-    console.error(`❌ Error fetching booking with ID ${id}:`, err);
+    console.error(`Error fetching booking with ID ${id}:`, err);
     res.status(500).json({ error: 'Internal server error', details: err.message });
   }
 });
@@ -1302,14 +1157,11 @@ app.get('/bookings/:id', async (req, res) => {
 // GET /clients/:id/bookings
 app.get('/clients/:id/bookings', async (req, res) => {
   const { id } = req.params;
-  
   try {
     const clientCheck = await pool.query('SELECT id FROM clients WHERE id = $1', [id]);
-    
     if (clientCheck.rows.length === 0) {
       return res.status(404).json({ error: 'Client not found' });
     }
-    
     const result = await pool.query(`
       SELECT
         b.id,
@@ -1321,10 +1173,9 @@ app.get('/clients/:id/bookings', async (req, res) => {
       WHERE b.client_id = $1
       ORDER BY b.booking_date DESC
     `, [id]);
-    
     res.json(result.rows);
   } catch (err) {
-    console.error(`❌ Error fetching bookings for client ID ${id}:`, err);
+    console.error(`Error fetching bookings for client ID ${id}:`, err);
     res.status(500).json({ error: 'Internal server error', details: err.message });
   }
 });
@@ -1333,36 +1184,28 @@ app.get('/clients/:id/bookings', async (req, res) => {
 app.put('/bookings/:id', async (req, res) => {
   const { id } = req.params;
   const { client_id, service_name, booking_date } = req.body;
-  
   try {
     let updateQuery = 'UPDATE bookings SET service_name = $1, booking_date = $2, updated_at = CURRENT_TIMESTAMP';
     const queryParams = [service_name, booking_date];
     let paramIndex = 3;
-    
     if (client_id !== undefined) {
       const clientExists = await pool.query('SELECT id FROM clients WHERE id = $1', [client_id]);
-      
       if (clientExists.rows.length === 0) {
         return res.status(404).json({ error: 'New client_id not found.' });
       }
-      
       updateQuery += `, client_id = $${paramIndex}`;
       queryParams.push(client_id);
       paramIndex++;
     }
-    
     updateQuery += ` WHERE id = $${paramIndex} RETURNING id, client_id, service_name, booking_date`;
     queryParams.push(id);
-    
     const result = await pool.query(updateQuery, queryParams);
-    
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Booking not found' });
     }
-    
     res.json(result.rows[0]);
   } catch (err) {
-    console.error(`❌ Error updating booking with ID ${id}:`, err);
+    console.error(`Error updating booking with ID ${id}:`, err);
     res.status(500).json({ error: 'Internal server error', details: err.message });
   }
 });
@@ -1370,17 +1213,14 @@ app.put('/bookings/:id', async (req, res) => {
 // DELETE /bookings/:id
 app.delete('/bookings/:id', async (req, res) => {
   const { id } = req.params;
-  
   try {
     const result = await pool.query('DELETE FROM bookings WHERE id = $1 RETURNING id', [id]);
-    
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Booking not found' });
     }
-    
     res.status(204).send();
   } catch (err) {
-    console.error(`❌ Error deleting booking with ID ${id}:`, err);
+    console.error(`Error deleting booking with ID ${id}:`, err);
     res.status(500).json({ error: 'Internal server error', details: err.message });
   }
 });
@@ -1388,11 +1228,9 @@ app.delete('/bookings/:id', async (req, res) => {
 // GET /check-duplicate-client
 app.get('/check-duplicate-client', async (req, res) => {
   const { phone } = req.query;
-  
   if (!phone) {
     return res.status(400).json({ error: 'Phone number is required' });
   }
-  
   try {
     const result = await pool.query(
       `SELECT c.id, c.first_name, c.last_name, c.phone_number,
@@ -1405,14 +1243,13 @@ app.get('/check-duplicate-client', async (req, res) => {
                LIMIT 5`,
       [phone]
     );
-    
     res.json({
       exists: result.rows.length > 0,
       clients: result.rows,
       count: result.rows.length
     });
   } catch (err) {
-    console.error('❌ Error checking duplicate client:', err);
+    console.error('Error checking duplicate client:', err);
     res.status(500).json({ error: 'Internal server error', details: err.message });
   }
 });
@@ -1445,18 +1282,18 @@ app.get('/health', (req, res) => {
 
 pool.connect((err, client, release) => {
   if (err) {
-    console.error('❌ Error connecting to PostgreSQL:', err.stack);
+    console.error('Error connecting to PostgreSQL:', err.stack);
   } else {
-    console.log('✅ Connected to PostgreSQL database (Neon)!');
+    console.log('Connected to PostgreSQL database (Neon)!');
     release();
   }
 });
 
 app.listen(port, () => {
-  console.log(`🚀 Server running on port ${port}`);
-  console.log(`🌐 CORS enabled for origins: ${allowedOrigins.join(', ')}`);
+  console.log(`Server running on port ${port}`);
+  console.log(`CORS enabled for origins: ${allowedOrigins.join(', ')}`);
   if (bot) {
-    console.log(`🤖 Telegram bot with buttons is active`);
+    console.log(`Telegram bot with buttons is active`);
   }
 });
 
