@@ -539,76 +539,46 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
       }
     });
 
-// === Клиенты ===
-bot.onText(/👥 Клиенты/, async (msg) => {
-  const chatId = msg.chat.id;
-  if (chatId.toString() !== ADMIN_CHAT_ID) {
-    bot.sendMessage(chatId, '⛔ Нет доступа', { ...backKeyboard });
-    return;
-  }
-  try {
-    const result = await pool.query(`
-      SELECT c.*, COUNT(b.id) as booking_count 
-      FROM clients c 
-      LEFT JOIN bookings b ON c.id = b.client_id 
-      GROUP BY c.id 
-      ORDER BY c.id DESC
-    `); // Убрал LIMIT 10
-    
-    if (result.rows.length === 0) {
-      bot.sendMessage(chatId, '👥 *Нет клиентов в базе*', {
-        parse_mode: 'Markdown',
-        ...backKeyboard
-      });
-      return;
-    }
-    
-    let message = '👥 *Все клиенты:*\n\n';
-    result.rows.forEach((client, index) => {
-      message += `*${index + 1}. ${client.first_name || ''} ${client.last_name || ''}*\n`;
-      message += `   📞 ${client.phone_number || '-'}\n`;
-      message += `   📧 ${client.email || '-'}\n`;
-      message += `   📊 Бронирований: ${client.booking_count}\n`;
-      message += `   🆔 ID: ${client.id}\n\n`;
+    // === Клиенты ===
+    bot.onText(/👥 Клиенты/, async (msg) => {
+      const chatId = msg.chat.id;
+      if (chatId.toString() !== ADMIN_CHAT_ID) {
+        bot.sendMessage(chatId, '⛔ Нет доступа', { ...backKeyboard });
+        return;
+      }
+      try {
+        const result = await pool.query(`
+          SELECT c.*, COUNT(b.id) as booking_count
+          FROM clients c
+          LEFT JOIN bookings b ON c.id = b.client_id
+          GROUP BY c.id
+          ORDER BY c.id DESC
+          LIMIT 10
+        `);
+        if (result.rows.length === 0) {
+          bot.sendMessage(chatId, '👥 *Нет клиентов в базе*', {
+            parse_mode: 'Markdown',
+            ...backKeyboard
+          });
+          return;
+        }
+        let message = '👥 *Последние клиенты:*\n\n';
+        result.rows.forEach((client, index) => {
+          message += `*${index + 1}. ${client.first_name} ${client.last_name}*\n`;
+          message += `   📞 ${client.phone_number || '-'}\n`;  // Добавил отступ
+          message += `   📧 ${client.email || '-'}\n`;         // Добавил отступ
+          message += `   📊 Бронирований: ${client.booking_count}\n`;  // Добавил отступ
+          message += `   🆔 ID: ${client.id}\n\n`;
+        });
+        bot.sendMessage(chatId, message, {
+          parse_mode: 'Markdown',
+          ...backKeyboard
+        });
+      } catch (error) {
+        console.error('❌ Error fetching clients:', error);
+        bot.sendMessage(chatId, '❌ Ошибка', { ...backKeyboard });
+      }
     });
-    
-    // Добавляем общее количество
-    message += `\n*Всего клиентов: ${result.rows.length}*`;
-    
-    bot.sendMessage(chatId, message, {
-      parse_mode: 'Markdown',
-      ...backKeyboard
-    });
-    
-  } catch (error) {
-    console.error('❌ Error fetching clients:', error);
-    console.error('❌ Error details:', error.message);
-    bot.sendMessage(chatId, '❌ Ошибка при получении данных клиентов', { ...backKeyboard });
-  }
-});
-
-function escapeMarkdown(text) {
-  if (!text) return text;
-  return text.toString()
-    .replace(/_/g, '\\_')
-    .replace(/\*/g, '\\*')
-    .replace(/\[/g, '\\[')
-    .replace(/\]/g, '\\]')
-    .replace(/\(/g, '\\(')
-    .replace(/\)/g, '\\)')
-    .replace(/~/g, '\\~')
-    .replace(/`/g, '\\`')
-    .replace(/>/g, '\\>')
-    .replace(/#/g, '\\#')
-    .replace(/\+/g, '\\+')
-    .replace(/-/g, '\\-')
-    .replace(/=/g, '\\=')
-    .replace(/\|/g, '\\|')
-    .replace(/\{/g, '\\{')
-    .replace(/\}/g, '\\}')
-    .replace(/\./g, '\\.')
-    .replace(/!/g, '\\!');
-}
 
     // === Статистика ===
     bot.onText(/📊 Статистика/, async (msg) => {
