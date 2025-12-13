@@ -20,7 +20,7 @@ const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:5173',
   'https://karcher-front.vercel.app',
-  'https://karcher-front.netlify.app'
+  'https://karcher-stolin.netlify.app'
 ];
 
 const corsOptions = {
