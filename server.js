@@ -548,12 +548,12 @@ bot.onText(/👥 Клиенты/, async (msg) => {
   }
   try {
     const result = await pool.query(`
-      SELECT c.*, COUNT(b.id) as booking_count
-      FROM clients c
-      LEFT JOIN bookings b ON c.id = b.client_id
-      GROUP BY c.id
+      SELECT c.*, COUNT(b.id) as booking_count 
+      FROM clients c 
+      LEFT JOIN bookings b ON c.id = b.client_id 
+      GROUP BY c.id 
       ORDER BY c.id DESC
-    `);
+    `); // Убрал LIMIT 10
     
     if (result.rows.length === 0) {
       bot.sendMessage(chatId, '👥 *Нет клиентов в базе*', {
@@ -563,52 +563,26 @@ bot.onText(/👥 Клиенты/, async (msg) => {
       return;
     }
     
-    const totalClients = result.rows.length;
-    
-    // Формируем первое сообщение с заголовком
-    let messages = [];
-    let currentMessage = `👥 *Все клиенты (${totalClients}):*\n\n`;
-    
+    let message = '👥 *Все клиенты:*\n\n';
     result.rows.forEach((client, index) => {
-      const firstName = client.first_name || '';
-      const lastName = client.last_name || '';
-      const phoneNumber = client.phone_number || '-';
-      const email = client.email || '-';
-      
-      const clientInfo = `*${index + 1}. ${firstName} ${lastName}*\n` +
-                        `   📞 ${phoneNumber}\n` +
-                        `   📧 ${email}\n` +
-                        `   📊 Бронирований: ${client.booking_count}\n` +
-                        `   🆔 ID: ${client.id}\n\n`;
-      
-      // Проверяем, не превысит ли добавление этого клиента лимит
-      if (currentMessage.length + clientInfo.length > 4000) {
-        // Сохраняем текущее сообщение и начинаем новое
-        messages.push(currentMessage);
-        currentMessage = `👥 *Клиенты (продолжение):*\n\n${clientInfo}`;
-      } else {
-        currentMessage += clientInfo;
-      }
+      message += `*${index + 1}. ${client.first_name || ''} ${client.last_name || ''}*\n`;
+      message += `   📞 ${client.phone_number || '-'}\n`;
+      message += `   📧 ${client.email || '-'}\n`;
+      message += `   📊 Бронирований: ${client.booking_count}\n`;
+      message += `   🆔 ID: ${client.id}\n\n`;
     });
     
-    // Добавляем последнее сообщение
-    messages.push(currentMessage);
+    // Добавляем общее количество
+    message += `\n*Всего клиентов: ${result.rows.length}*`;
     
-    // Отправляем все сообщения
-    for (let i = 0; i < messages.length; i++) {
-      await bot.sendMessage(chatId, messages[i], {
-        parse_mode: 'Markdown',
-        ...(i === messages.length - 1 ? backKeyboard : {}) // Клавиатура только в последнем сообщении
-      });
-      
-      // Небольшая задержка между сообщениями
-      if (i < messages.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-    }
+    bot.sendMessage(chatId, message, {
+      parse_mode: 'Markdown',
+      ...backKeyboard
+    });
     
   } catch (error) {
     console.error('❌ Error fetching clients:', error);
+    console.error('❌ Error details:', error.message);
     bot.sendMessage(chatId, '❌ Ошибка при получении данных клиентов', { ...backKeyboard });
   }
 });
