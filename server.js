@@ -25,22 +25,43 @@ const allowedOrigins = [
 
 const corsOptions = {
   origin: function (origin, callback) {
+    // Разрешаем запросы без origin (например, Postman, мобильные приложения)
     if (!origin) return callback(null, true);
+    
+    // Проверяем, есть ли origin в списке разрешенных
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      console.log('CORS: Запрос с origin:', origin);
+      // Логируем неизвестный origin, но разрешаем (для отладки)
+      console.log('CORS: Запрос с неизвестным origin:', origin);
+      // Для безопасности можно закомментировать следующую строку, чтобы блокировать неизвестные origin
       callback(null, true);
     }
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
   exposedHeaders: ['Content-Length', 'X-Powered-By'],
-  maxAge: 86400
+  maxAge: 86400,
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 };
 
+// Применяем CORS ко всем запросам
 app.use(cors(corsOptions));
+
+// Явная обработка preflight OPTIONS запросов для всех маршрутов
+app.options('*', (req, res) => {
+  const origin = req.headers.origin;
+  if (!origin || allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin || '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Max-Age', '86400');
+  }
+  res.sendStatus(204);
+});
 
 // ============ TELEGRAM BOT ============
 let bot = null;
@@ -51,6 +72,16 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
   try {
     bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
     const ADMIN_CHAT_ID = process.env.TELEGRAM_ADMIN_CHAT_ID;
+    
+    // Обработка ошибок polling
+    bot.on('polling_error', (error) => {
+      console.error('❌ Telegram polling error:', error.message);
+      // Если конфликт (409), просто логируем - другой экземпляр работает
+      if (error.code === 'ETELEGRAM' && error.message.includes('409')) {
+        console.log('⚠️ Another bot instance is running. This instance will not poll.');
+      }
+    });
+    
     console.log('🤖 Telegram bot initialized with button interface');
 
     const mainKeyboard = {
@@ -697,8 +728,15 @@ const saltRounds = 10;
 
 app.use(express.json());
 app.use((req, res, next) => {
+  const origin = req.headers.origin;
   console.log(`${new Date().toISOString()} ${req.method} ${req.url}`);
-  console.log('Origin:', req.headers.origin);
+  console.log('Origin:', origin);
+  console.log('Allowed origins:', allowedOrigins);
+  if (origin && allowedOrigins.includes(origin)) {
+    console.log('✅ Origin разрешен');
+  } else if (origin) {
+    console.log('⚠️ Origin не в списке разрешенных');
+  }
   next();
 });
 
@@ -1331,5 +1369,33 @@ app.listen(port, () => {
     console.log(`Telegram bot with buttons is active`);
   }
 });
+
+// ============ КОРРЕКТНОЕ ЗАВЕРШЕНИЕ ПРОЦЕССА ============
+const gracefulShutdown = (signal) => {
+  console.log(`\n${signal} received. Shutting down gracefully...`);
+  
+  if (bot) {
+    try {
+      bot.stopPolling();
+      console.log('✅ Telegram bot polling stopped');
+    } catch (error) {
+      console.error('Error stopping bot polling:', error.message);
+    }
+  }
+  
+  pool.end(() => {
+    console.log('✅ PostgreSQL connection pool closed');
+    process.exit(0);
+  });
+  
+  // Принудительное завершение через 10 секунд, если graceful shutdown не удался
+  setTimeout(() => {
+    console.error('⚠️ Forced shutdown after timeout');
+    process.exit(1);
+  }, 10000);
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 module.exports = pool;
