@@ -836,7 +836,8 @@ app.post('/login', async (req, res) => {
 // POST /find-or-create-client
 app.post('/find-or-create-client', async (req, res) => {
   console.log('Создание нового клиента:', req.body);
-  const { first_name, last_name, phone_number } = req.body;
+  const { first_name, last_name, phone_number, address } = req.body;
+  console.log('📋 Данные клиента:', { first_name, last_name, phone_number, address });
   if (!first_name || !phone_number) {
     return res.status(400).json({
       error: 'Имя и телефон обязательны'
@@ -848,10 +849,10 @@ app.post('/find-or-create-client', async (req, res) => {
     const tempPassword = 'temp' + Math.random().toString(36).slice(-8);
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
     const newClient = await pool.query(
-      `INSERT INTO clients (first_name, last_name, phone_number, email, password_hash)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING id, first_name, last_name, phone_number`,
-      [first_name, last_name || '', phone_number, email, hashedPassword]
+      `INSERT INTO clients (first_name, last_name, phone_number, email, password_hash, address)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, first_name, last_name, phone_number, address`,
+      [first_name, last_name || '', phone_number, email, hashedPassword, address || null]
     );
     const clientId = newClient.rows[0].id;
     console.log('✅ Создан новый клиент ID:', clientId, 'Имя:', first_name, 'Телефон:', phone_number);
@@ -867,10 +868,10 @@ app.post('/find-or-create-client', async (req, res) => {
       const fallbackHashedPassword = await bcrypt.hash('temp' + Math.random().toString(36).slice(-8), 10);
       try {
         const fallbackClient = await pool.query(
-          `INSERT INTO clients (first_name, last_name, phone_number, email, password_hash)
-           VALUES ($1, $2, $3, $4, $5)
+          `INSERT INTO clients (first_name, last_name, phone_number, email, password_hash, address)
+           VALUES ($1, $2, $3, $4, $5, $6)
            RETURNING id`,
-          [first_name, last_name || '', phone_number, fallbackEmail, fallbackHashedPassword]
+          [first_name, last_name || '', phone_number, fallbackEmail, fallbackHashedPassword, address || null]
         );
         res.status(200).json({
           client_id: fallbackClient.rows[0].id,
@@ -897,6 +898,7 @@ app.post('/find-or-create-client', async (req, res) => {
 app.post('/bookings', async (req, res) => {
   console.log('POST /bookings запрос:', req.body);
   const { client_id, service_name, booking_date, address } = req.body;
+  console.log('📋 Полученные данные:', { client_id, service_name, booking_date, address });
   if (!client_id || !service_name || !booking_date) {
     console.error('❌ Отсутствуют обязательные поля:', { client_id, service_name, booking_date });
     return res.status(400).json({
@@ -906,7 +908,7 @@ app.post('/bookings', async (req, res) => {
   try {
     console.log('Проверяем клиента ID:', client_id);
     const clientCheck = await pool.query(
-      'SELECT id FROM clients WHERE id = $1',
+      'SELECT id, address FROM clients WHERE id = $1',
       [client_id]
     );
     if (clientCheck.rows.length === 0) {
@@ -915,12 +917,17 @@ app.post('/bookings', async (req, res) => {
         error: 'Клиент не найден'
       });
     }
+    
+    // Если адрес не передан в запросе, берем адрес из профиля клиента
+    const bookingAddress = address || clientCheck.rows[0].address || null;
+    console.log('📍 Адрес для бронирования:', bookingAddress, '(из запроса:', address, ', из клиента:', clientCheck.rows[0].address, ')');
+    
     console.log('✅ Клиент найден, создаем бронирование...');
     const result = await pool.query(
       `INSERT INTO bookings (client_id, service_name, booking_date, address)
        VALUES ($1, $2, $3, $4)
        RETURNING id, client_id, service_name, booking_date, address`,
-      [client_id, service_name, booking_date, address || null]
+      [client_id, service_name, booking_date, bookingAddress]
     );
     const booking = result.rows[0];
     console.log('✅ Бронирование создано:', booking);
