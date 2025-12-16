@@ -200,7 +200,9 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
             message += `${serviceEmoji} *${serviceName}:*\n`;
             bookings.forEach((booking, index) => {
               const date = new Date(booking.booking_date).toLocaleDateString('ru-RU');
+              const address = booking.address ? `📍 ${booking.address}` : '';
               message += ` ${index + 1}. 📅 ${date} | 👤 ${booking.first_name || '-'} ${booking.last_name || ''} | 📞 ${booking.phone_number || '-'} | 🆔 *${booking.id}*\n`;
+              if (address) message += `    ${address}\n`;
             });
             message += '\n';
           }
@@ -254,6 +256,7 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
           message += ` ${time}\n`;
           message += ` 👤 ${booking.first_name || '-'} ${booking.last_name || ''}\n`;
           message += ` 📞 ${booking.phone_number || '-'}\n`;
+          if (booking.address) message += ` 📍 ${booking.address}\n`;
           message += ` 🆔 *ID: ${booking.id}*\n\n`;
         });
 
@@ -351,6 +354,14 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
         );
       } else if (userStates[chatId].step === 'client_phone') {
         userStates[chatId].data.client_phone = text;
+        userStates[chatId].step = 'client_address';
+        bot.sendMessage(chatId,
+          '📍 *Введите адрес доставки:*\n\n' +
+          '_Пример: г. Минск, ул. Пушкина, д. 10, кв. 5_',
+          { parse_mode: 'Markdown' }
+        );
+      } else if (userStates[chatId].step === 'client_address') {
+        userStates[chatId].data.client_address = text;
         userStates[chatId].step = 'confirm';
         const date = new Date(userStates[chatId].data.booking_date);
         const dateStr = date.toLocaleDateString('ru-RU');
@@ -359,7 +370,8 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
           `*Услуга:* ${userStates[chatId].data.service_name}\n` +
           `*Дата:* ${dateStr}\n` +
           `*Клиент:* ${userStates[chatId].data.client_name}\n` +
-          `*Телефон:* ${userStates[chatId].data.client_phone}\n\n` +
+          `*Телефон:* ${userStates[chatId].data.client_phone}\n` +
+          `*Адрес:* ${userStates[chatId].data.client_address}\n\n` +
           'Все верно?',
           {
             parse_mode: 'Markdown',
@@ -393,10 +405,10 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
         const clientId = newClient.rows[0].id;
 
         const bookingResult = await pool.query(
-          `INSERT INTO bookings (client_id, service_name, booking_date)
-           VALUES ($1, $2, $3)
-           RETURNING id, client_id, service_name, booking_date`,
-          [clientId, data.service_name, data.booking_date]
+          `INSERT INTO bookings (client_id, service_name, booking_date, address)
+           VALUES ($1, $2, $3, $4)
+           RETURNING id, client_id, service_name, booking_date, address`,
+          [clientId, data.service_name, data.booking_date, data.client_address || null]
         );
 
         const dateStr = new Date(data.booking_date).toLocaleDateString('ru-RU');
@@ -408,6 +420,7 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
           `*Дата:* ${dateStr}\n` +
           `*Клиент:* ${data.client_name}\n` +
           `*Телефон:* ${data.client_phone}\n` +
+          `*Адрес:* ${data.client_address || 'Не указан'}\n` +
           `*ID бронирования:* ${booking.id}`,
           {
             parse_mode: 'Markdown',
@@ -496,6 +509,7 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
             `*Дата:* ${date}\n` +
             `*Клиент:* ${booking.first_name || '-'} ${booking.last_name || ''}\n` +
             `*Телефон:* ${booking.phone_number || '-'}\n` +
+            (booking.address ? `*Адрес:* ${booking.address}\n` : '') +
             `*ID:* ${booking.id}\n\n` +
             `Удалить это бронирование?`,
             {
@@ -533,6 +547,7 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_ADMIN_CHAT_ID) {
           `*Дата:* ${date}\n` +
           `*Клиент:* ${booking.first_name || '-'} ${booking.last_name || ''}\n` +
           `*Телефон:* ${booking.phone_number || '-'}\n` +
+          (booking.address ? `*Адрес:* ${booking.address}\n` : '') +
           `*ID:* ${booking.id}\n\n` +
           `Для обновления данных на сайте перезагрузите страницу`,
           {
@@ -690,6 +705,7 @@ function escapeMarkdown(text) {
           `*Дата:* ${date}\n` +
           `*Клиент:* ${clientName}\n` +
           `*Телефон:* ${clientPhone}\n` +
+          `*Адрес:* ${bookingData.address || 'Не указан'}\n` +
           `*Время создания:* ${time}\n` +
           `*ID:* ${bookingData.id}`;
         await bot.sendMessage(ADMIN_CHAT_ID, message, {
@@ -880,7 +896,7 @@ app.post('/find-or-create-client', async (req, res) => {
 // POST /bookings
 app.post('/bookings', async (req, res) => {
   console.log('POST /bookings запрос:', req.body);
-  const { client_id, service_name, booking_date } = req.body;
+  const { client_id, service_name, booking_date, address } = req.body;
   if (!client_id || !service_name || !booking_date) {
     console.error('❌ Отсутствуют обязательные поля:', { client_id, service_name, booking_date });
     return res.status(400).json({
@@ -901,10 +917,10 @@ app.post('/bookings', async (req, res) => {
     }
     console.log('✅ Клиент найден, создаем бронирование...');
     const result = await pool.query(
-      `INSERT INTO bookings (client_id, service_name, booking_date)
-       VALUES ($1, $2, $3)
-       RETURNING id, client_id, service_name, booking_date`,
-      [client_id, service_name, booking_date]
+      `INSERT INTO bookings (client_id, service_name, booking_date, address)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, client_id, service_name, booking_date, address`,
+      [client_id, service_name, booking_date, address || null]
     );
     const booking = result.rows[0];
     console.log('✅ Бронирование создано:', booking);
@@ -939,6 +955,7 @@ app.get('/bookings', async (req, res) => {
         b.id,
         b.service_name,
         b.booking_date,
+        b.address,
         b.created_at,
         b.updated_at,
         c.id AS client_id,
@@ -1194,6 +1211,7 @@ app.get('/bookings/:id', async (req, res) => {
         b.id,
         b.service_name,
         b.booking_date,
+        b.address,
         b.created_at,
         b.updated_at,
         c.id AS client_id,
@@ -1227,6 +1245,7 @@ app.get('/clients/:id/bookings', async (req, res) => {
         b.id,
         b.service_name,
         b.booking_date,
+        b.address,
         b.created_at,
         b.updated_at
       FROM bookings b
@@ -1243,7 +1262,7 @@ app.get('/clients/:id/bookings', async (req, res) => {
 // PUT /bookings/:id
 app.put('/bookings/:id', async (req, res) => {
   const { id } = req.params;
-  const { client_id, service_name, booking_date } = req.body;
+  const { client_id, service_name, booking_date, address } = req.body;
   try {
     let updateQuery = 'UPDATE bookings SET service_name = $1, booking_date = $2, updated_at = CURRENT_TIMESTAMP';
     const queryParams = [service_name, booking_date];
@@ -1257,7 +1276,12 @@ app.put('/bookings/:id', async (req, res) => {
       queryParams.push(client_id);
       paramIndex++;
     }
-    updateQuery += ` WHERE id = $${paramIndex} RETURNING id, client_id, service_name, booking_date`;
+    if (address !== undefined) {
+      updateQuery += `, address = $${paramIndex}`;
+      queryParams.push(address);
+      paramIndex++;
+    }
+    updateQuery += ` WHERE id = $${paramIndex} RETURNING id, client_id, service_name, booking_date, address`;
     queryParams.push(id);
     const result = await pool.query(updateQuery, queryParams);
     if (result.rows.length === 0) {
